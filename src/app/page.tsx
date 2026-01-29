@@ -1,4 +1,56 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+
+type Job = {
+  sessionId: string;
+  state?: string;
+  createdAt?: { seconds?: number; nanoseconds?: number };
+  input?: { fileName?: string; fileSize?: number };
+};
+
+function formatBytes(bytes: number) {
+  if (!bytes || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const idx = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, idx);
+  return `${value.toFixed(value >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`;
+}
+
 export default function Home() {
+  const [uid, setUid] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUid(u?.uid ?? null);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!uid) {
+      setJobs([]);
+      return;
+    }
+    const q = query(collection(db, "users", uid, "jobs"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setJobs(snap.docs.map((d) => d.data() as Job));
+    });
+    return () => unsub();
+  }, [uid]);
+
+  const metrics = useMemo(() => {
+    const totalJobs = jobs.length;
+    const totalBytes = jobs.reduce((acc, j) => acc + (j.input?.fileSize ?? 0), 0);
+    const failedJobs = jobs.filter((j) => j.state === "FAILED").length;
+    const latestState = jobs[0]?.state ?? (uid ? "NO_JOBS" : "SIGNED_OUT");
+    return { totalJobs, totalBytes, failedJobs, latestState };
+  }, [jobs, uid]);
+
   return (
     <main className="page">
       <section className="hero">
@@ -23,23 +75,28 @@ export default function Home() {
         </div>
         <div className="hero-card">
           <div className="signal">Run Status</div>
-          <h2>Clinical Preview</h2>
+          <h2>Workspace Snapshot</h2>
           <p>
-            조직 타일의 밀도, 핵 분포, 염색 균질도를 실시간으로 요약해
-            진단 준비 상태를 확인합니다.
+            {uid
+              ? "업로드된 슬라이드와 작업 상태를 실시간으로 집계합니다."
+              : "로그인하면 개인 작업 상태와 업로드 통계를 확인할 수 있습니다."}
           </p>
           <div className="metrics">
             <div className="metric">
-              <strong>94%</strong>
-              <span>Stain Consistency</span>
+              <strong>{metrics.totalJobs}</strong>
+              <span>Total Jobs</span>
             </div>
             <div className="metric">
-              <strong>3.1M</strong>
-              <span>Tiles Processed</span>
+              <strong>{formatBytes(metrics.totalBytes)}</strong>
+              <span>Uploaded Size</span>
             </div>
             <div className="metric">
-              <strong>12</strong>
-              <span>Outlier Regions</span>
+              <strong>{metrics.failedJobs}</strong>
+              <span>Failed Jobs</span>
+            </div>
+            <div className="metric">
+              <strong>{metrics.latestState}</strong>
+              <span>Latest State</span>
             </div>
           </div>
         </div>
