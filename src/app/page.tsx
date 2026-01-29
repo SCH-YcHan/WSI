@@ -23,6 +23,7 @@ function formatBytes(bytes: number) {
 export default function Home() {
   const [uid, setUid] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [error, setError] = useState<string>("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -34,12 +35,25 @@ export default function Home() {
   useEffect(() => {
     if (!uid) {
       setJobs([]);
+      setError("");
       return;
     }
     const q = query(collection(db, "users", uid, "jobs"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setJobs(snap.docs.map((d) => d.data() as Job));
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setError("");
+        setJobs(snap.docs.map((d) => d.data() as Job));
+      },
+      (err) => {
+        setJobs([]);
+        setError(
+          err?.code === "permission-denied"
+            ? "Firestore 접근 권한이 없습니다. 로그인 상태와 보안 규칙을 확인하세요."
+            : "작업 데이터를 불러오지 못했습니다."
+        );
+      }
+    );
     return () => unsub();
   }, [uid]);
 
@@ -81,6 +95,7 @@ export default function Home() {
               ? "업로드된 슬라이드와 작업 상태를 실시간으로 집계합니다."
               : "로그인하면 개인 작업 상태와 업로드 통계를 확인할 수 있습니다."}
           </p>
+          {error && <p style={{ color: "#9a2f2f", marginTop: 8 }}>{error}</p>}
           <div className="metrics">
             <div className="metric">
               <strong>{metrics.totalJobs}</strong>

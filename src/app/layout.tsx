@@ -35,6 +35,10 @@ export default function RootLayout({
       <body
         className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} antialiased`}
       >
+        <a className="home-link" href="/">
+          <span className="home-link-dot" />
+          WSI Home
+        </a>
         {children}
       </body>
     </html>
