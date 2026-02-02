@@ -1,32 +1,44 @@
 const samples = {
   "wt1-adenine-x20": {
     title: "WT1 Adenine x20",
-    image: "public/analysis-samples/WT1-Adenine_x20.tif",
+    image: "public/analysis-detail/wt1-adenine-x20.png",
+    sourceWidth: 13300,
+    sourceHeight: 19432,
     geojson: "public/geojson/wt1-adenine-x20.geojson",
   },
   "wt2-adenine-x20": {
     title: "WT2 Adenine x20",
-    image: "public/analysis-samples/WT2-Adenine_x20.tif",
+    image: "public/analysis-detail/wt2-adenine-x20.png",
+    sourceWidth: 13297,
+    sourceHeight: 21276,
     geojson: "public/geojson/wt2-adenine-x20.geojson",
   },
   "wt3-adenine-x20": {
     title: "WT3 Adenine x20",
-    image: "public/analysis-samples/WT3-Adenine_x20.tif",
+    image: "public/analysis-detail/wt3-adenine-x20.png",
+    sourceWidth: 13299,
+    sourceHeight: 20354,
     geojson: "public/geojson/wt3-adenine-x20.geojson",
   },
   "wt4-normal-x20": {
     title: "WT4 Normal x20",
-    image: "public/analysis-samples/WT4-Normal_x20.tif",
+    image: "public/analysis-detail/wt4-normal-x20.png",
+    sourceWidth: 11096,
+    sourceHeight: 19437,
     geojson: "public/geojson/wt4-normal-x20.geojson",
   },
   "wt5-normal-x20": {
     title: "WT5 Normal x20",
-    image: "public/analysis-samples/WT5-Normal_x20.tif",
+    image: "public/analysis-detail/wt5-normal-x20.png",
+    sourceWidth: 11096,
+    sourceHeight: 19437,
     geojson: "public/geojson/wt5-normal-x20.geojson",
   },
   "wt6-normal-x20": {
     title: "WT6 Normal x20",
-    image: "public/analysis-samples/WT6-Normal_x20.tif",
+    image: "public/analysis-detail/wt6-normal-x20.png",
+    sourceWidth: 14403,
+    sourceHeight: 19430,
     geojson: "public/geojson/wt6-normal-x20.geojson",
   },
 };
@@ -50,12 +62,12 @@ function setError(text) {
   toggleEl.disabled = true;
 }
 
-function buildPath(rings) {
+function buildPath(rings, scaleX, scaleY) {
   return rings
     .map(
       (ring) =>
         ring
-          .map((point, index) => `${index === 0 ? "M" : "L"}${point[0]} ${point[1]}`)
+          .map((point, index) => `${index === 0 ? "M" : "L"}${point[0] * scaleX} ${point[1] * scaleY}`)
           .join(" ") + " Z"
     )
     .join(" ");
@@ -94,16 +106,18 @@ async function loadOverlay() {
     const res = await fetch(sample.geojson);
     if (!res.ok) throw new Error("geojson load failed");
     const data = await res.json();
+    const scaleX = imageEl.naturalWidth / sample.sourceWidth;
+    const scaleY = imageEl.naturalHeight / sample.sourceHeight;
     overlayEl.setAttribute("viewBox", `0 0 ${imageEl.naturalWidth} ${imageEl.naturalHeight}`);
     const paths = [];
     data.features.forEach((feature) => {
       const geometry = feature.geometry;
       if (!geometry) return;
       if (geometry.type === "Polygon") {
-        paths.push(buildPath(geometry.coordinates));
+        paths.push(buildPath(geometry.coordinates, scaleX, scaleY));
       } else {
         geometry.coordinates.forEach((polygon) => {
-          paths.push(buildPath(polygon));
+          paths.push(buildPath(polygon, scaleX, scaleY));
         });
       }
     });
