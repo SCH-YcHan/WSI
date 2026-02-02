@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WSI Analysis Examples</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <p class="signal">Pathology Intelligence</p>
+          <h1>
+            <span>인공지능 기술로</span>
+            <span>병리를 진단합니다</span>
+          </h1>
+          <p class="hero-copy">
+            슬라이드 수집부터 품질 관리, 조직 구조 분석, 리포팅까지.
+            임상·연구 환경에 최적화된 전 과정을 한 화면에서 보여줍니다.
+          </p>
+          <div class="cta-row">
+            <a class="cta primary" href="#samples">분석 예시 보기</a>
+            <a class="cta ghost" href="public/analysis-samples/hires/wt2-adenine-x20.png" target="_blank" rel="noreferrer">대표 고해상도 열기</a>
+          </div>
+        </div>
+        <div class="hero-card">
+          <p class="signal">Run Status</p>
+          <p>실시간 분석 기능은 제거했고, 예시 결과 열람만 제공합니다.</p>
+          <div class="metrics">
+            <div class="metric"><strong>6</strong><span>Example Slides</span></div>
+            <div class="metric"><strong>Static</strong><span>Deployment Mode</span></div>
+            <div class="metric"><strong>JPG + PNG</strong><span>Formats</span></div>
+            <div class="metric"><strong>Ready</strong><span>Public Access</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-head">
+        <div>
+          <p class="section-kicker">Workspace</p>
+          <h2>내 분석 공간</h2>
+        </div>
+        <p>기존 구성은 유지하면서, 예시 결과 확인에 집중했습니다.</p>
+      </section>
+      <section class="workspace-entry-grid">
+        <div class="card workspace-entry-card">
+          <div class="workspace-entry-head">
+            <div>
+              <p class="signal">Latest Session</p>
+              <h3>Sample Session</h3>
+            </div>
+            <span class="badge good">READY</span>
+          </div>
+          <div class="workspace-entry-meta">
+            <div><span>파일명</span><strong>wt2-adenine-x20</strong></div>
+            <div><span>상태</span><strong>예시 결과 확인 가능</strong></div>
+          </div>
+          <div class="workspace-entry-actions">
+            <a class="btn primary" href="#samples">분석 결과 열기</a>
+            <a class="btn ghost" href="analysis.html?slug=wt2-adenine-x20">상세 보기</a>
+          </div>
+        </div>
+        <div class="card workspace-entry-card">
+          <p class="signal">Quick Start</p>
+          <h3>샘플 고해상도 이미지</h3>
+          <p class="hint">고해상도 PNG 결과를 새 탭에서 바로 열어 확대 확인할 수 있습니다.</p>
+          <div class="workspace-entry-actions">
+            <a class="btn" href="public/analysis-samples/hires/wt1-adenine-x20.png" target="_blank" rel="noreferrer">High-Res 열기</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-head">
+        <div>
+          <p class="section-kicker">Platform Overview</p>
+          <h2>워크플로우 구성</h2>
+        </div>
+        <p>데이터 수집부터 결과 공유까지의 구성을 화면에서 그대로 확인할 수 있습니다.</p>
+      </section>
+      <section class="panel-grid">
+        <div class="panel"><h3>Specimen Intake</h3><p>WSI 업로드 및 Metadata 자동 연결</p></div>
+        <div class="panel"><h3>QC &amp; Tiling</h3><p>배경 제거, 타일링, 객체 검출 수행</p></div>
+        <div class="panel"><h3>Feature Extraction</h3><p>조직 패턴 및 염색 특성 지표 요약</p></div>
+        <div class="panel"><h3>Review &amp; Share</h3><p>리포트 생성 및 협업 공유 지원</p></div>
+      </section>
+
+      <section class="section-head">
+        <div>
+          <p class="section-kicker">Execution Flow</p>
+          <h2>분석 파이프라인</h2>
+        </div>
+      </section>
+      <section class="pipeline">
+        <div class="step"><p class="signal">Step 01</p><h3>Slide Ingestion</h3><p>WSI 수집 및 스토리지 저장</p></div>
+        <div class="step"><p class="signal">Step 02</p><h3>Quality Gates</h3><p>품질 및 염색 변이 평가</p></div>
+        <div class="step"><p class="signal">Step 03</p><h3>Model Inference</h3><p>조직 패턴 분류 및 이상 영역 탐지</p></div>
+        <div class="step"><p class="signal">Step 04</p><h3>Reporting</h3><p>임상 리포트 (요약 지표, 시각화)</p></div>
+      </section>
+
+      <section class="analysis-preview" id="samples">
+        <div class="analysis-head">
+          <p class="section-kicker">Analysis Sample</p>
+          <h2>분석 예시 이미지</h2>
+          <p>클릭하면 원본 예시 이미지와 GeoJSON 객체를 함께 볼 수 있습니다.</p>
+        </div>
+        <div class="analysis-grid">
+          <a class="analysis-tile" href="analysis.html?slug=wt1-adenine-x20"><img src="public/analysis-samples/wt1-adenine-x20.jpg" alt="WT1" /></a>
+          <a class="analysis-tile" href="analysis.html?slug=wt2-adenine-x20"><img src="public/analysis-samples/wt2-adenine-x20.jpg" alt="WT2" /></a>
+          <a class="analysis-tile" href="analysis.html?slug=wt3-adenine-x20"><img src="public/analysis-samples/wt3-adenine-x20.jpg" alt="WT3" /></a>
+          <a class="analysis-tile" href="analysis.html?slug=wt4-normal-x20"><img src="public/analysis-samples/wt4-normal-x20.jpg" alt="WT4" /></a>
+          <a class="analysis-tile" href="analysis.html?slug=wt5-normal-x20"><img src="public/analysis-samples/wt5-normal-x20.jpg" alt="WT5" /></a>
+          <a class="analysis-tile" href="analysis.html?slug=wt6-normal-x20"><img src="public/analysis-samples/wt6-normal-x20.jpg" alt="WT6" /></a>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

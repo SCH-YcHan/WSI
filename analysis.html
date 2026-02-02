@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WSI Analysis Detail</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="analysis-detail">
+      <div class="analysis-detail-card">
+        <p class="signal">Analysis Sample</p>
+        <h1 id="sample-title">샘플 로딩 중...</h1>
+        <div class="analysis-detail-image" id="image-wrap">
+          <img id="sample-image" alt="Sample" />
+          <svg id="overlay" class="analysis-overlay" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+        <div class="analysis-detail-actions">
+          <a class="btn ghost" href="index.html">메인으로 돌아가기</a>
+          <button class="btn ghost" id="toggle-overlay" type="button">객체 보기</button>
+          <a class="btn" id="open-hires" target="_blank" rel="noreferrer">High-Res 열기</a>
+        </div>
+        <p class="hint" id="status-text"></p>
+      </div>
+    </main>
+    <script src="analysis.js"></script>
+  </body>
+</html>
