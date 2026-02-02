@@ -39,7 +39,6 @@ const titleEl = document.getElementById("sample-title");
 const imageEl = document.getElementById("sample-image");
 const overlayEl = document.getElementById("overlay");
 const toggleEl = document.getElementById("toggle-overlay");
-const openHiresEl = document.getElementById("open-hires");
 const statusEl = document.getElementById("status-text");
 
 let overlayLoaded = false;
@@ -136,7 +135,6 @@ if (!sample) {
 } else {
   titleEl.textContent = sample.title;
   imageEl.src = sample.image;
-  openHiresEl.href = sample.image;
 }
 
 toggleEl.addEventListener("click", async () => {
