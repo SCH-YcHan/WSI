@@ -48,6 +48,8 @@ const slug = (params.get("slug") || "").toLowerCase();
 const sample = samples[slug];
 
 const titleEl = document.getElementById("sample-title");
+const wrapEl = document.getElementById("image-wrap");
+const zoomLayerEl = document.getElementById("zoom-layer");
 const imageEl = document.getElementById("sample-image");
 const overlayEl = document.getElementById("overlay");
 const toggleEl = document.getElementById("toggle-overlay");
@@ -55,11 +57,32 @@ const statusEl = document.getElementById("status-text");
 
 let overlayLoaded = false;
 let overlayVisible = false;
+let zoomLevel = 1;
+const zoomSteps = [1, 2, 4];
 
 function setError(text) {
   titleEl.textContent = "이미지를 찾을 수 없습니다.";
   statusEl.textContent = text;
   toggleEl.disabled = true;
+}
+
+function applyZoom(nextZoom, focusXRatio = 0.5, focusYRatio = 0.5) {
+  zoomLevel = nextZoom;
+  zoomLayerEl.style.width = `${zoomLevel * 100}%`;
+  wrapEl.classList.toggle("zoomed", zoomLevel > 1);
+
+  requestAnimationFrame(() => {
+    if (zoomLevel === 1) {
+      wrapEl.scrollLeft = 0;
+      wrapEl.scrollTop = 0;
+      return;
+    }
+
+    const targetLeft = focusXRatio * wrapEl.scrollWidth - wrapEl.clientWidth / 2;
+    const targetTop = focusYRatio * wrapEl.scrollHeight - wrapEl.clientHeight / 2;
+    wrapEl.scrollLeft = Math.max(0, targetLeft);
+    wrapEl.scrollTop = Math.max(0, targetTop);
+  });
 }
 
 function buildPath(rings, scaleX, scaleY) {
@@ -143,6 +166,17 @@ if (!sample) {
   titleEl.textContent = sample.title;
   imageEl.src = sample.image;
 }
+
+wrapEl.addEventListener("click", (event) => {
+  const index = zoomSteps.indexOf(zoomLevel);
+  const nextZoom = zoomSteps[(index + 1) % zoomSteps.length];
+  const rect = wrapEl.getBoundingClientRect();
+  const clickX = event.clientX - rect.left + wrapEl.scrollLeft;
+  const clickY = event.clientY - rect.top + wrapEl.scrollTop;
+  const focusXRatio = wrapEl.scrollWidth ? clickX / wrapEl.scrollWidth : 0.5;
+  const focusYRatio = wrapEl.scrollHeight ? clickY / wrapEl.scrollHeight : 0.5;
+  applyZoom(nextZoom, focusXRatio, focusYRatio);
+});
 
 toggleEl.addEventListener("click", async () => {
   if (!overlayLoaded) {
