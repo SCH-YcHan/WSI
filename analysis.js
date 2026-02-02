@@ -124,8 +124,7 @@ async function loadOverlay() {
     if (!res.ok) throw new Error("geojson load failed");
     const data = await res.json();
     const bounds = collectBounds(data);
-    const scale = Math.max(bounds.maxX / imageEl.naturalWidth, bounds.maxY / imageEl.naturalHeight, 1);
-    overlayEl.setAttribute("viewBox", `0 0 ${imageEl.naturalWidth * scale} ${imageEl.naturalHeight * scale}`);
+    overlayEl.setAttribute("viewBox", `0 0 ${imageEl.naturalWidth} ${imageEl.naturalHeight}`);
 
     const paths = [];
     data.features.forEach((feature) => {
@@ -141,12 +140,18 @@ async function loadOverlay() {
       }
     });
 
-    overlayEl.innerHTML = paths
+    const scaleX = imageEl.naturalWidth / bounds.width;
+    const scaleY = imageEl.naturalHeight / bounds.height;
+    const translateX = -bounds.minX * scaleX;
+    const translateY = -bounds.minY * scaleY;
+    const transformedPaths = paths
       .map(
         (d) =>
           `<path d="${d}" fill="rgba(46, 204, 113, 0.14)" stroke="rgba(39, 174, 96, 0.85)" stroke-width="0.9" vector-effect="non-scaling-stroke"></path>`
       )
       .join("");
+
+    overlayEl.innerHTML = `<g transform="matrix(${scaleX} 0 0 ${scaleY} ${translateX} ${translateY})">${transformedPaths}</g>`;
 
     overlayLoaded = true;
     statusEl.textContent = "";
