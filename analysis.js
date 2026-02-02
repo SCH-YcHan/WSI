@@ -85,9 +85,33 @@ function collectBounds(featureCollection) {
   });
 
   if (!Number.isFinite(minX)) {
-    return { minX: 0, minY: 0, width: 1, height: 1 };
+    return { minX: 0, minY: 0, maxX: 1, maxY: 1, width: 1, height: 1 };
   }
-  return { minX, minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+  return { minX, minY, maxX, maxY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+
+function waitForImageReady() {
+  if (imageEl.complete && imageEl.naturalWidth > 0 && imageEl.naturalHeight > 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const onLoad = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("image load failed"));
+    };
+    const cleanup = () => {
+      imageEl.removeEventListener("load", onLoad);
+      imageEl.removeEventListener("error", onError);
+    };
+
+    imageEl.addEventListener("load", onLoad);
+    imageEl.addEventListener("error", onError);
+  });
 }
 
 async function loadOverlay() {
@@ -95,11 +119,13 @@ async function loadOverlay() {
 
   statusEl.textContent = "객체를 불러오는 중...";
   try {
+    await waitForImageReady();
     const res = await fetch(sample.geojson);
     if (!res.ok) throw new Error("geojson load failed");
     const data = await res.json();
     const bounds = collectBounds(data);
-    overlayEl.setAttribute("viewBox", `${bounds.minX} ${bounds.minY} ${bounds.width} ${bounds.height}`);
+    const scale = Math.max(bounds.maxX / imageEl.naturalWidth, bounds.maxY / imageEl.naturalHeight, 1);
+    overlayEl.setAttribute("viewBox", `0 0 ${imageEl.naturalWidth * scale} ${imageEl.naturalHeight * scale}`);
 
     const paths = [];
     data.features.forEach((feature) => {
