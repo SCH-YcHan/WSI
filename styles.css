@@ -1,3 +1,5 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
+
 :root {
   --ink-900: #111314;
   --ink-700: #2c2f33;
@@ -16,18 +18,19 @@ body {
     radial-gradient(1200px 800px at 20% -10%, #eef3f4 0%, rgba(238, 243, 244, 0) 60%),
     radial-gradient(1000px 700px at 90% 0%, #f4f4f2 0%, rgba(244, 244, 242, 0) 60%),
     #f8f8f7;
-  font-family: "Source Sans 3", "Helvetica Neue", Arial, sans-serif;
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif;
 }
 
 a { color: inherit; text-decoration: none; }
 
 .page { max-width: 1180px; margin: 0 auto; padding: 80px 28px 110px; }
-.hero { display: grid; gap: 40px; grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr); }
+.hero { display: block; }
 .hero h1 { margin: 0 0 22px; font-size: clamp(3rem, 4.6vw, 4.1rem); line-height: 1.02; }
 .hero h1 span { display: block; }
 .hero-copy { font-size: 1.12rem; color: var(--ink-700); line-height: 1.45; }
 .hero-card, .card, .panel, .analysis-detail-card { background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(17, 19, 20, 0.1); border-radius: 20px; }
 .hero-card { padding: 28px; }
+.hero-main-card { max-width: 980px; }
 .signal { font-size: .9rem; text-transform: uppercase; letter-spacing: .26em; color: var(--signal-500); }
 .cta-row, .workspace-entry-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
 .cta, .btn { border-radius: 999px; padding: 11px 18px; border: 1px solid rgba(17, 19, 20, 0.15); }
@@ -63,6 +66,5 @@ a { color: inherit; text-decoration: none; }
 .analysis-detail-actions { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
 @media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; }
   .analysis-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
