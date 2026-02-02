@@ -184,9 +184,6 @@ async function openZoomModal() {
   modalImageEl.src = sample.image;
   await waitForImageReady(modalImageEl);
 
-  modalOverlayEl.style.width = `${modalImageEl.naturalWidth}px`;
-  modalOverlayEl.style.height = `${modalImageEl.naturalHeight}px`;
-
   if (overlayLoaded) {
     renderOverlayInto(modalOverlayEl, modalImageEl);
     syncOverlayVisibility();
