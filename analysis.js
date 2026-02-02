@@ -66,6 +66,7 @@ const modalScaleLabelEl = document.getElementById("zoom-scale-label");
 const drawToggleEl = document.getElementById("draw-toggle");
 const drawCloseEl = document.getElementById("draw-close");
 const drawDeleteEl = document.getElementById("draw-delete");
+const drawLinkDirEl = document.getElementById("draw-link-dir");
 const drawSaveEl = document.getElementById("draw-save");
 const zoomHelpEl = document.getElementById("zoom-help");
 
@@ -89,6 +90,7 @@ let userPolygons = [];
 let selectedPolygonId = null;
 let dragVertex = null;
 let polygonIdSeed = 1;
+let saveRootDirHandle = null;
 
 function setError(text) {
   titleEl.textContent = "이미지를 찾을 수 없습니다.";
@@ -320,7 +322,22 @@ function saveUserPolygons() {
 
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "").replace("T", "-");
   const filename = `${slug}-user-annotations-${stamp}.geojson`;
-  const blob = new Blob([JSON.stringify(featureCollection, null, 2)], { type: "application/geo+json" });
+  const payload = JSON.stringify(featureCollection, null, 2);
+
+  if (saveRootDirHandle) {
+    saveUserPolygonsToDirectory(filename, payload)
+      .then(() => setDrawHelp(`저장 완료: public/user-annotations/${filename}`))
+      .catch(() => {
+        saveUserPolygonsAsDownload(filename, payload);
+      });
+    return;
+  }
+
+  saveUserPolygonsAsDownload(filename, payload);
+}
+
+function saveUserPolygonsAsDownload(filename, payload) {
+  const blob = new Blob([payload], { type: "application/geo+json" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -329,7 +346,27 @@ function saveUserPolygons() {
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
-  setDrawHelp(`저장 완료: ${filename}`);
+  setDrawHelp(`다운로드 저장 완료: ${filename}`);
+}
+
+async function connectSaveDirectory() {
+  if (!window.showDirectoryPicker) {
+    setDrawHelp("이 브라우저는 폴더 저장 연결을 지원하지 않습니다.");
+    return;
+  }
+
+  const picked = await window.showDirectoryPicker({ mode: "readwrite" });
+  saveRootDirHandle = picked;
+  drawLinkDirEl.textContent = "저장 위치 연결됨";
+  setDrawHelp("저장 위치 연결 완료. user-annotations 폴더에 저장합니다.");
+}
+
+async function saveUserPolygonsToDirectory(filename, payload) {
+  const annotationsDir = await saveRootDirHandle.getDirectoryHandle("user-annotations", { create: true });
+  const fileHandle = await annotationsDir.getFileHandle(filename, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(payload);
+  await writable.close();
 }
 
 function renderOverlayInto(svgEl, imgEl) {
@@ -482,6 +519,14 @@ drawDeleteEl.addEventListener("click", () => {
 
 drawSaveEl.addEventListener("click", () => {
   saveUserPolygons();
+});
+
+drawLinkDirEl.addEventListener("click", async () => {
+  try {
+    await connectSaveDirectory();
+  } catch {
+    setDrawHelp("저장 위치 연결이 취소되었습니다.");
+  }
 });
 
 modalDrawOverlayEl.addEventListener("pointerdown", (event) => {
