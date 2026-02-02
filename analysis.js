@@ -1,32 +1,32 @@
 const samples = {
   "wt1-adenine-x20": {
     title: "WT1 Adenine x20",
-    image: "public/analysis-samples/hires/wt1-adenine-x20.png",
+    image: "public/analysis-samples/WT1-Adenine_x20.tif",
     geojson: "public/geojson/wt1-adenine-x20.geojson",
   },
   "wt2-adenine-x20": {
     title: "WT2 Adenine x20",
-    image: "public/analysis-samples/hires/wt2-adenine-x20.png",
+    image: "public/analysis-samples/WT2-Adenine_x20.tif",
     geojson: "public/geojson/wt2-adenine-x20.geojson",
   },
   "wt3-adenine-x20": {
     title: "WT3 Adenine x20",
-    image: "public/analysis-samples/hires/wt3-adenine-x20.png",
+    image: "public/analysis-samples/WT3-Adenine_x20.tif",
     geojson: "public/geojson/wt3-adenine-x20.geojson",
   },
   "wt4-normal-x20": {
     title: "WT4 Normal x20",
-    image: "public/analysis-samples/hires/wt4-normal-x20.png",
+    image: "public/analysis-samples/WT4-Normal_x20.tif",
     geojson: "public/geojson/wt4-normal-x20.geojson",
   },
   "wt5-normal-x20": {
     title: "WT5 Normal x20",
-    image: "public/analysis-samples/hires/wt5-normal-x20.png",
+    image: "public/analysis-samples/WT5-Normal_x20.tif",
     geojson: "public/geojson/wt5-normal-x20.geojson",
   },
   "wt6-normal-x20": {
     title: "WT6 Normal x20",
-    image: "public/analysis-samples/hires/wt6-normal-x20.png",
+    image: "public/analysis-samples/WT6-Normal_x20.tif",
     geojson: "public/geojson/wt6-normal-x20.geojson",
   },
 };
@@ -50,49 +50,12 @@ function setError(text) {
   toggleEl.disabled = true;
 }
 
-function forEachPoint(featureCollection, cb) {
-  featureCollection.features.forEach((feature) => {
-    const geometry = feature.geometry;
-    if (!geometry) return;
-    const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
-    polygons.forEach((polygon) => {
-      polygon.forEach((ring) => {
-        ring.forEach(([x, y]) => cb(x, y));
-      });
-    });
-  });
-}
-
-function detectGeoBounds(featureCollection) {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = 0;
-  let maxY = 0;
-  forEachPoint(featureCollection, (x, y) => {
-    if (x < minX) minX = x;
-    if (y < minY) minY = y;
-    if (x > maxX) maxX = x;
-    if (y > maxY) maxY = y;
-  });
-
-  if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
-    return { minX: 0, minY: 0, width: 1, height: 1 };
-  }
-
-  return {
-    minX,
-    minY,
-    width: Math.max(1, maxX - minX),
-    height: Math.max(1, maxY - minY),
-  };
-}
-
-function buildMappedPath(rings, minX, minY, scaleX, scaleY) {
+function buildPath(rings) {
   return rings
     .map(
       (ring) =>
         ring
-          .map((point, index) => `${index === 0 ? "M" : "L"}${(point[0] - minX) * scaleX} ${(point[1] - minY) * scaleY}`)
+          .map((point, index) => `${index === 0 ? "M" : "L"}${point[0]} ${point[1]}`)
           .join(" ") + " Z"
     )
     .join(" ");
@@ -131,19 +94,16 @@ async function loadOverlay() {
     const res = await fetch(sample.geojson);
     if (!res.ok) throw new Error("geojson load failed");
     const data = await res.json();
-    const geoBounds = detectGeoBounds(data);
-    const scaleX = imageEl.naturalWidth / geoBounds.width;
-    const scaleY = imageEl.naturalHeight / geoBounds.height;
     overlayEl.setAttribute("viewBox", `0 0 ${imageEl.naturalWidth} ${imageEl.naturalHeight}`);
     const paths = [];
     data.features.forEach((feature) => {
       const geometry = feature.geometry;
       if (!geometry) return;
       if (geometry.type === "Polygon") {
-        paths.push(buildMappedPath(geometry.coordinates, geoBounds.minX, geoBounds.minY, scaleX, scaleY));
+        paths.push(buildPath(geometry.coordinates));
       } else {
         geometry.coordinates.forEach((polygon) => {
-          paths.push(buildMappedPath(polygon, geoBounds.minX, geoBounds.minY, scaleX, scaleY));
+          paths.push(buildPath(polygon));
         });
       }
     });
