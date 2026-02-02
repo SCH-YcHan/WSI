@@ -483,21 +483,24 @@ drawSaveEl.addEventListener("click", () => {
   saveUserPolygons();
 });
 
-modalDrawOverlayEl.addEventListener("click", (event) => {
+modalDrawOverlayEl.addEventListener("pointerdown", (event) => {
   if (!drawMode) return;
+
   const handle = event.target.closest("circle[data-draft-index]");
   if (handle) {
     const index = Number(handle.dataset.draftIndex);
     if (index === 0 && draftPoints.length >= 3) {
       closeDraftPolygon();
-      return;
     }
+    event.preventDefault();
+    return;
   }
 
   const poly = event.target.closest("[data-poly-id]");
   if (poly) {
     selectedPolygonId = Number(poly.dataset.polyId);
     renderDrawOverlay();
+    event.preventDefault();
     return;
   }
 
@@ -505,6 +508,7 @@ modalDrawOverlayEl.addEventListener("click", (event) => {
   draftPoints.push(point);
   selectedPolygonId = null;
   renderDrawOverlay();
+  event.preventDefault();
 });
 
 modalViewportEl.addEventListener("pointerdown", (event) => {
@@ -521,6 +525,7 @@ modalViewportEl.addEventListener("pointerdown", (event) => {
       modalViewportEl.setPointerCapture(event.pointerId);
       return;
     }
+    return;
   }
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (activePointers.size === 1 && !drawMode) {
