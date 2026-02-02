@@ -75,6 +75,7 @@ function quantile(values, q) {
 function collectGeometry(featureCollection) {
   const paths = [];
   const points = [];
+  const centroids = [];
   featureCollection.features.forEach((feature) => {
     const geometry = feature.geometry;
     if (!geometry) return;
@@ -82,14 +83,23 @@ function collectGeometry(featureCollection) {
     const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
     polygons.forEach((polygon) => {
       paths.push(buildPath(polygon));
+      let sumX = 0;
+      let sumY = 0;
+      let count = 0;
       polygon.forEach((ring) => {
         ring.forEach(([x, y]) => {
           points.push([x, y]);
+          sumX += x;
+          sumY += y;
+          count += 1;
         });
       });
+      if (count) {
+        centroids.push([sumX / count, sumY / count]);
+      }
     });
   });
-  return { paths, points };
+  return { paths, points, centroids };
 }
 
 function scanTissue(imageData, width, height, step = 2) {
@@ -108,9 +118,12 @@ function scanTissue(imageData, width, height, step = 2) {
     const g = imageData[index + 1];
     const b = imageData[index + 2];
     const a = imageData[index + 3];
-    const spread = Math.max(r, g, b) - Math.min(r, g, b);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const spread = max - min;
     const lum = (r + g + b) / 3;
-    return a > 0 && (lum < 242 || spread > 10);
+    // White background is high-luminance and low-chroma. Keep tissue detection strict.
+    return a > 0 && !((lum > 246 && spread < 8) || (lum > 240 && spread < 5));
   }
 
   for (let y = 0; y < height; y += step) {
@@ -180,9 +193,11 @@ function collectGeoStats(points) {
 
 function scoreTransform(points, tissueBounds, transform) {
   if (!points.length) return 0;
-  const sampleStep = Math.max(1, Math.floor(points.length / 1500));
+  const sampleStep = Math.max(1, Math.floor(points.length / 500));
   let tissueHits = 0;
+  let nearHits = 0;
   let outOfBounds = 0;
+  let backgroundHits = 0;
   let total = 0;
 
   for (let i = 0; i < points.length; i += sampleStep) {
@@ -196,20 +211,29 @@ function scoreTransform(points, tissueBounds, transform) {
       total += 1;
       continue;
     }
-    const hit =
-      tissueBounds.isTissueAt(mappedX, mappedY) ||
-      tissueBounds.isTissueAt(mappedX - 1, mappedY) ||
-      tissueBounds.isTissueAt(mappedX + 1, mappedY) ||
-      tissueBounds.isTissueAt(mappedX, mappedY - 1) ||
-      tissueBounds.isTissueAt(mappedX, mappedY + 1);
-
-    if (hit) tissueHits += 1;
+    const hit = tissueBounds.isTissueAt(mappedX, mappedY);
+    if (hit) {
+      tissueHits += 1;
+    } else {
+      const near =
+        tissueBounds.isTissueAt(mappedX - 1, mappedY) ||
+        tissueBounds.isTissueAt(mappedX + 1, mappedY) ||
+        tissueBounds.isTissueAt(mappedX, mappedY - 1) ||
+        tissueBounds.isTissueAt(mappedX, mappedY + 1) ||
+        tissueBounds.isTissueAt(mappedX - 2, mappedY) ||
+        tissueBounds.isTissueAt(mappedX + 2, mappedY) ||
+        tissueBounds.isTissueAt(mappedX, mappedY - 2) ||
+        tissueBounds.isTissueAt(mappedX, mappedY + 2);
+      if (near) nearHits += 1;
+      else backgroundHits += 1;
+    }
     total += 1;
   }
 
-  const hitRate = tissueHits / Math.max(1, total);
+  const hitRate = (tissueHits + nearHits * 0.35) / Math.max(1, total);
   const oobRate = outOfBounds / Math.max(1, total);
-  return hitRate - oobRate * 0.6;
+  const backgroundRate = backgroundHits / Math.max(1, total);
+  return hitRate - oobRate * 1.2 - backgroundRate * 1.0;
 }
 
 function makeTransform(scale, centerGeoX, centerGeoY, centerImgX, centerImgY, flipX = false, flipY = false) {
@@ -223,7 +247,7 @@ function makeTransform(scale, centerGeoX, centerGeoY, centerImgX, centerImgY, fl
 function refineTranslation(points, tissueBounds, transform) {
   let best = { ...transform };
   let bestScore = scoreTransform(points, tissueBounds, best);
-  let step = Math.max(imageEl.naturalWidth, imageEl.naturalHeight) / 4;
+  let step = Math.max(imageEl.naturalWidth, imageEl.naturalHeight) / 5;
 
   for (let round = 0; round < 8; round += 1) {
     const candidates = [
@@ -257,11 +281,9 @@ function refineTranslation(points, tissueBounds, transform) {
 
 function optimizeTransform(points, tissueBounds) {
   const geo = collectGeoStats(points);
-  const baseScale = Math.min(
-    tissueBounds.width / Math.max(1, geo.width),
-    tissueBounds.height / Math.max(1, geo.height)
-  );
-  const scaleMultipliers = [0.45, 0.6, 0.75, 0.9, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0];
+  const baseScaleX = tissueBounds.width / Math.max(1, geo.width);
+  const baseScaleY = tissueBounds.height / Math.max(1, geo.height);
+  const scaleMultipliers = [0.45, 0.6, 0.75, 0.9, 1.0, 1.15, 1.3, 1.5, 1.75, 2.1, 2.5, 3.0];
   const orientations = [
     { flipX: false, flipY: false },
     { flipX: true, flipY: false },
@@ -269,18 +291,34 @@ function optimizeTransform(points, tissueBounds) {
     { flipX: true, flipY: true },
   ];
 
-  let bestTransform = makeTransform(baseScale, geo.centerX, geo.centerY, tissueBounds.centerX, tissueBounds.centerY);
+  let bestTransform = makeTransform(
+    Math.min(baseScaleX, baseScaleY),
+    geo.centerX,
+    geo.centerY,
+    tissueBounds.centerX,
+    tissueBounds.centerY
+  );
   let bestScore = Number.NEGATIVE_INFINITY;
 
   orientations.forEach(({ flipX, flipY }) => {
-    scaleMultipliers.forEach((multiplier) => {
-      const scale = Math.max(0.0001, baseScale * multiplier);
-      const seed = makeTransform(scale, geo.centerX, geo.centerY, tissueBounds.centerX, tissueBounds.centerY, flipX, flipY);
-      const refined = refineTranslation(points, tissueBounds, seed);
-      if (refined.score > bestScore) {
-        bestScore = refined.score;
-        bestTransform = refined.transform;
-      }
+    scaleMultipliers.forEach((multX) => {
+      scaleMultipliers.forEach((multY) => {
+        const scaleX = Math.max(0.0001, baseScaleX * multX);
+        const scaleY = Math.max(0.0001, baseScaleY * multY);
+        const matrixA = flipX ? -scaleX : scaleX;
+        const matrixD = flipY ? -scaleY : scaleY;
+        const seed = {
+          matrixA,
+          matrixD,
+          matrixE: tissueBounds.centerX - matrixA * geo.centerX,
+          matrixF: tissueBounds.centerY - matrixD * geo.centerY,
+        };
+        const refined = refineTranslation(points, tissueBounds, seed);
+        if (refined.score > bestScore) {
+          bestScore = refined.score;
+          bestTransform = refined.transform;
+        }
+      });
     });
   });
 
@@ -320,10 +358,10 @@ async function loadOverlay() {
     const res = await fetch(sample.geojson);
     if (!res.ok) throw new Error("geojson load failed");
     const data = await res.json();
-    const { paths, points } = collectGeometry(data);
+    const { paths, centroids } = collectGeometry(data);
     const tissueBounds = detectTissueBoundsFromImage();
     overlayEl.setAttribute("viewBox", `0 0 ${imageEl.naturalWidth} ${imageEl.naturalHeight}`);
-    const bestTransform = optimizeTransform(points, tissueBounds);
+    const bestTransform = optimizeTransform(centroids, tissueBounds);
 
     const transformedPaths = paths
       .map(
