@@ -1,0 +1,7 @@
+numpy
+Pillow
+pyvips
+shapely
+ultralytics
+torch
+torchvision

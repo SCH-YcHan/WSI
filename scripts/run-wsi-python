@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cmd=(/home/user/wsi/.venv/bin/python "$@")
+escaped_cmd=$(printf '%q ' "${cmd[@]}")
+exec nix-shell -p python311 vips gcc zlib xorg.libxcb xorg.libX11 --run "ZLIB_DIR=\$(dirname \$(ls /nix/store/*-zlib-*/lib/libz.so.1 2>/dev/null | head -n1)); \
+LIBVIPS_DIR=\$(dirname \$(ls /nix/store/*-vips-*/lib/libvips.so.* 2>/dev/null | head -n1)); \
+LIBXCB_DIR=\$(dirname \$(ls /nix/store/*-libxcb-*/lib/libxcb.so.1 2>/dev/null | head -n1)); \
+LIBX11_DIR=\$(dirname \$(ls /nix/store/*-libX11-*/lib/libX11.so.6 2>/dev/null | head -n1)); \
+LIBSTDCPP_DIR=\$(dirname \$(gcc -print-file-name=libstdc++.so.6)); \
+LIBGCC_DIR=\$(dirname \$(gcc -print-file-name=libgcc_s.so.1)); \
+LD_LIBRARY_PATH=\${ZLIB_DIR}:\${LIBVIPS_DIR}:\${LIBXCB_DIR}:\${LIBX11_DIR}:\${LIBSTDCPP_DIR}:\${LIBGCC_DIR}:\$LD_LIBRARY_PATH ${escaped_cmd}"

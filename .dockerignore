@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.vscode
+.env.local
+firebase-debug.log
+predictions
+images
+overviews
+geojson
+screenshots
+*.log

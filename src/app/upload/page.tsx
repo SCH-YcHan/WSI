@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, storage } from "@/lib/firebase";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { ref, uploadBytesResumable } from "firebase/storage";
@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 export default function UploadPage() {
   const router = useRouter();
   const [uid, setUid] = useState<string>("");
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [status, setStatus] = useState<string>("");
@@ -17,11 +18,16 @@ export default function UploadPage() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) router.push("/login");
-      else setUid(u.uid);
+      if (u) setUid(u.uid);
+      else setUid("");
+      setCheckingAuth(false);
     });
     return () => unsub();
   }, [router]);
+
+  useEffect(() => {
+    if (!checkingAuth && !uid) router.push("/login?next=/upload");
+  }, [checkingAuth, uid, router]);
 
   useEffect(() => {
     const id = Math.random().toString(16).slice(2) + Date.now().toString(16);
@@ -78,32 +84,102 @@ export default function UploadPage() {
     );
   };
 
+  if (checkingAuth) {
+    return (
+      <main className="workspace-page">
+        <section className="workspace-header">
+          <div>
+            <div className="signal">Data Intake</div>
+            <h1>WSI 업로드</h1>
+            <p>세션을 확인 중입니다.</p>
+          </div>
+        </section>
+        <section className="upload-grid">
+          <div className="card upload-card">
+            <div className="skeleton block" />
+            <div className="skeleton line" />
+            <div className="skeleton line short" />
+            <div className="skeleton bar" />
+          </div>
+          <div className="card upload-card info-card">
+            <div className="skeleton line" />
+            <div className="skeleton line short" />
+            <div className="skeleton block" />
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
-    <div style={{ maxWidth: 720, margin: "40px auto", display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>WSI 업로드</h1>
-        <button onClick={() => signOut(auth)}>로그아웃</button>
-      </div>
-
-      <p>UID: {uid}</p>
-      <p>세션ID: {sessionId || "생성 중..."}</p>
-
-      <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-      <button onClick={onUpload} disabled={!uid || !file}>
-        업로드 시작
-      </button>
-
-      <div>
-        <div>진행률: {progress}%</div>
-        <div style={{ height: 10, background: "#eee", borderRadius: 6, overflow: "hidden" }}>
-          <div style={{ width: `${progress}%`, height: 10, background: "#333" }} />
+    <main className="workspace-page">
+      <section className="workspace-header">
+        <div>
+          <div className="signal">Data Intake</div>
+          <h1>WSI 업로드</h1>
+          <p>병리 슬라이드를 안전하게 올리고 자동 분석 작업을 시작합니다.</p>
         </div>
-      </div>
+        <div className="workspace-actions">
+          <button className="btn ghost" onClick={() => router.push("/jobs")}>
+            작업 목록
+          </button>
+        </div>
+      </section>
 
-      {status && <p>{status}</p>}
+      <section className="upload-grid">
+        <div className="card upload-card">
+          <div className="upload-drop">
+            <input
+              id="wsi-file"
+              className="upload-input"
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+            <label className="upload-label" htmlFor="wsi-file">
+              <div className="upload-icon">+</div>
+              <div>
+                <strong>{file ? file.name : "파일 선택"}</strong>
+                <span>{file ? `${Math.round(file.size / 1024 / 1024)} MB` : "WSI 파일을 선택하세요."}</span>
+              </div>
+            </label>
+          </div>
 
-      <hr />
-      <button onClick={() => router.push("/jobs")}>내 작업 목록 보기</button>
-    </div>
+          <div className="upload-actions">
+            <button className="btn primary" onClick={onUpload} disabled={!uid || !file}>
+              업로드 시작
+            </button>
+            <div className="progress-meta">
+              <span>진행률</span>
+              <strong>{progress}%</strong>
+            </div>
+          </div>
+
+          <div className="progress-bar">
+            <div className="progress-fill" style={{ width: `${progress}%` }} />
+          </div>
+
+          {status && <p className="status">{status}</p>}
+        </div>
+
+        <div className="card upload-card info-card">
+          <div className="signal">Session</div>
+          <h2>업로드 정보</h2>
+          <div className="info-list">
+            <div>
+              <span>UID</span>
+              <strong>{uid}</strong>
+            </div>
+            <div>
+              <span>세션 ID</span>
+              <strong>{sessionId || "생성 중..."}</strong>
+            </div>
+          </div>
+          <div className="hint">
+            - 최대 2GB까지 업로드 가능
+            <br />- 업로드 완료 후 자동으로 작업이 생성됩니다.
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }

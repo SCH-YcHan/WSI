@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Source_Sans_3, Space_Mono } from "next/font/google";
 import "./globals.css";
+import AuthStatus from "@/components/AuthStatus";
 
 const displayFont = Cormorant_Garamond({
   variable: "--font-display",
@@ -39,6 +40,7 @@ export default function RootLayout({
           <span className="home-link-dot" />
           WSI Home
         </a>
+        <AuthStatus />
         {children}
       </body>
     </html>
