@@ -49,40 +49,34 @@ const sample = samples[slug];
 
 const titleEl = document.getElementById("sample-title");
 const wrapEl = document.getElementById("image-wrap");
-const zoomLayerEl = document.getElementById("zoom-layer");
 const imageEl = document.getElementById("sample-image");
 const overlayEl = document.getElementById("overlay");
 const toggleEl = document.getElementById("toggle-overlay");
 const statusEl = document.getElementById("status-text");
+const modalEl = document.getElementById("zoom-modal");
+const modalCloseEl = document.getElementById("zoom-close");
+const modalViewportEl = document.getElementById("zoom-viewport");
+const modalContentEl = document.getElementById("zoom-content");
+const modalImageEl = document.getElementById("zoom-image");
+const modalOverlayEl = document.getElementById("zoom-overlay");
+const modalScaleLabelEl = document.getElementById("zoom-scale-label");
 
 let overlayLoaded = false;
 let overlayVisible = false;
-let zoomLevel = 1;
-const zoomSteps = [1, 2, 4];
+let overlayMarkup = "";
+
+let modalZoom = 1;
+let modalBaseScale = 1;
+let modalPanX = 0;
+let modalPanY = 0;
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
 
 function setError(text) {
   titleEl.textContent = "이미지를 찾을 수 없습니다.";
   statusEl.textContent = text;
   toggleEl.disabled = true;
-}
-
-function applyZoom(nextZoom, focusXRatio = 0.5, focusYRatio = 0.5) {
-  zoomLevel = nextZoom;
-  zoomLayerEl.style.width = `${zoomLevel * 100}%`;
-  wrapEl.classList.toggle("zoomed", zoomLevel > 1);
-
-  requestAnimationFrame(() => {
-    if (zoomLevel === 1) {
-      wrapEl.scrollLeft = 0;
-      wrapEl.scrollTop = 0;
-      return;
-    }
-
-    const targetLeft = focusXRatio * wrapEl.scrollWidth - wrapEl.clientWidth / 2;
-    const targetTop = focusYRatio * wrapEl.scrollHeight - wrapEl.clientHeight / 2;
-    wrapEl.scrollLeft = Math.max(0, targetLeft);
-    wrapEl.scrollTop = Math.max(0, targetTop);
-  });
 }
 
 function buildPath(rings, scaleX, scaleY) {
@@ -96,8 +90,8 @@ function buildPath(rings, scaleX, scaleY) {
     .join(" ");
 }
 
-function waitForImageReady() {
-  if (imageEl.complete && imageEl.naturalWidth > 0 && imageEl.naturalHeight > 0) {
+function waitForImageReady(imgEl) {
+  if (imgEl.complete && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
     return Promise.resolve();
   }
 
@@ -111,13 +105,86 @@ function waitForImageReady() {
       reject(new Error("image load failed"));
     };
     const cleanup = () => {
-      imageEl.removeEventListener("load", onLoad);
-      imageEl.removeEventListener("error", onError);
+      imgEl.removeEventListener("load", onLoad);
+      imgEl.removeEventListener("error", onError);
     };
 
-    imageEl.addEventListener("load", onLoad);
-    imageEl.addEventListener("error", onError);
+    imgEl.addEventListener("load", onLoad);
+    imgEl.addEventListener("error", onError);
   });
+}
+
+function syncOverlayVisibility() {
+  const display = overlayVisible ? "block" : "none";
+  overlayEl.style.display = display;
+  modalOverlayEl.style.display = display;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function clampPan() {
+  const viewportW = modalViewportEl.clientWidth;
+  const viewportH = modalViewportEl.clientHeight;
+  const scaledW = modalImageEl.naturalWidth * modalBaseScale * modalZoom;
+  const scaledH = modalImageEl.naturalHeight * modalBaseScale * modalZoom;
+
+  if (scaledW <= viewportW) {
+    modalPanX = (viewportW - scaledW) / 2;
+  } else {
+    modalPanX = clamp(modalPanX, viewportW - scaledW, 0);
+  }
+
+  if (scaledH <= viewportH) {
+    modalPanY = (viewportH - scaledH) / 2;
+  } else {
+    modalPanY = clamp(modalPanY, viewportH - scaledH, 0);
+  }
+}
+
+function renderModalTransform() {
+  clampPan();
+  const totalScale = modalBaseScale * modalZoom;
+  modalContentEl.style.transform = `translate(${modalPanX}px, ${modalPanY}px) scale(${totalScale})`;
+  modalScaleLabelEl.textContent = `${Math.round(modalZoom * 100)}%`;
+}
+
+function renderOverlayInto(svgEl, imgEl) {
+  svgEl.setAttribute("viewBox", `0 0 ${imgEl.naturalWidth} ${imgEl.naturalHeight}`);
+  svgEl.innerHTML = overlayMarkup;
+}
+
+async function openZoomModal() {
+  if (!sample) return;
+  modalEl.hidden = false;
+  document.body.classList.add("zoom-open");
+  modalImageEl.src = sample.image;
+  await waitForImageReady(modalImageEl);
+
+  modalOverlayEl.style.width = `${modalImageEl.naturalWidth}px`;
+  modalOverlayEl.style.height = `${modalImageEl.naturalHeight}px`;
+
+  if (overlayLoaded) {
+    renderOverlayInto(modalOverlayEl, modalImageEl);
+    syncOverlayVisibility();
+  }
+
+  const viewportW = modalViewportEl.clientWidth;
+  const viewportH = modalViewportEl.clientHeight;
+  modalBaseScale = Math.min(viewportW / modalImageEl.naturalWidth, viewportH / modalImageEl.naturalHeight);
+  if (!Number.isFinite(modalBaseScale) || modalBaseScale <= 0) modalBaseScale = 1;
+  modalZoom = 1;
+  modalPanX = (viewportW - modalImageEl.naturalWidth * modalBaseScale) / 2;
+  modalPanY = (viewportH - modalImageEl.naturalHeight * modalBaseScale) / 2;
+  renderModalTransform();
+}
+
+function closeZoomModal() {
+  modalEl.hidden = true;
+  document.body.classList.remove("zoom-open");
+  isDragging = false;
+  modalViewportEl.classList.remove("dragging");
 }
 
 async function loadOverlay() {
@@ -125,7 +192,7 @@ async function loadOverlay() {
 
   statusEl.textContent = "객체를 불러오는 중...";
   try {
-    await waitForImageReady();
+    await waitForImageReady(imageEl);
     const res = await fetch(sample.geojson);
     if (!res.ok) throw new Error("geojson load failed");
     const data = await res.json();
@@ -145,12 +212,16 @@ async function loadOverlay() {
       }
     });
 
-    overlayEl.innerHTML = paths
+    overlayMarkup = paths
       .map(
         (d) =>
           `<path d="${d}" fill="rgba(46, 204, 113, 0.14)" stroke="rgba(39, 174, 96, 0.85)" stroke-width="0.9" vector-effect="non-scaling-stroke"></path>`
-      )
-      .join("");
+      ).join("");
+    renderOverlayInto(overlayEl, imageEl);
+    if (!modalEl.hidden && modalImageEl.naturalWidth > 0) {
+      renderOverlayInto(modalOverlayEl, modalImageEl);
+    }
+    syncOverlayVisibility();
 
     overlayLoaded = true;
     statusEl.textContent = "";
@@ -167,15 +238,8 @@ if (!sample) {
   imageEl.src = sample.image;
 }
 
-wrapEl.addEventListener("click", (event) => {
-  const index = zoomSteps.indexOf(zoomLevel);
-  const nextZoom = zoomSteps[(index + 1) % zoomSteps.length];
-  const rect = wrapEl.getBoundingClientRect();
-  const clickX = event.clientX - rect.left + wrapEl.scrollLeft;
-  const clickY = event.clientY - rect.top + wrapEl.scrollTop;
-  const focusXRatio = wrapEl.scrollWidth ? clickX / wrapEl.scrollWidth : 0.5;
-  const focusYRatio = wrapEl.scrollHeight ? clickY / wrapEl.scrollHeight : 0.5;
-  applyZoom(nextZoom, focusXRatio, focusYRatio);
+wrapEl.addEventListener("click", () => {
+  openZoomModal();
 });
 
 toggleEl.addEventListener("click", async () => {
@@ -185,6 +249,69 @@ toggleEl.addEventListener("click", async () => {
   }
 
   overlayVisible = !overlayVisible;
-  overlayEl.style.display = overlayVisible ? "block" : "none";
+  syncOverlayVisibility();
   toggleEl.textContent = overlayVisible ? "객체 숨기기" : "객체 보기";
 });
+
+modalCloseEl.addEventListener("click", closeZoomModal);
+
+modalEl.addEventListener("click", (event) => {
+  if (event.target === modalEl) closeZoomModal();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !modalEl.hidden) closeZoomModal();
+});
+
+modalViewportEl.addEventListener(
+  "wheel",
+  (event) => {
+    if (modalEl.hidden) return;
+    event.preventDefault();
+    const rect = modalViewportEl.getBoundingClientRect();
+    const cursorX = event.clientX - rect.left;
+    const cursorY = event.clientY - rect.top;
+    const currentScale = modalBaseScale * modalZoom;
+    const worldX = (cursorX - modalPanX) / currentScale;
+    const worldY = (cursorY - modalPanY) / currentScale;
+    const nextZoom = clamp(modalZoom * (event.deltaY < 0 ? 1.1 : 0.9), 1, 4);
+    const nextScale = modalBaseScale * nextZoom;
+    modalPanX = cursorX - worldX * nextScale;
+    modalPanY = cursorY - worldY * nextScale;
+    modalZoom = nextZoom;
+    renderModalTransform();
+  },
+  { passive: false }
+);
+
+modalViewportEl.addEventListener("pointerdown", (event) => {
+  if (modalEl.hidden) return;
+  isDragging = true;
+  dragStartX = event.clientX;
+  dragStartY = event.clientY;
+  modalViewportEl.classList.add("dragging");
+  modalViewportEl.setPointerCapture(event.pointerId);
+});
+
+modalViewportEl.addEventListener("pointermove", (event) => {
+  if (!isDragging || modalEl.hidden) return;
+  const dx = event.clientX - dragStartX;
+  const dy = event.clientY - dragStartY;
+  dragStartX = event.clientX;
+  dragStartY = event.clientY;
+  modalPanX += dx;
+  modalPanY += dy;
+  renderModalTransform();
+});
+
+function stopDragging(event) {
+  if (!isDragging) return;
+  isDragging = false;
+  modalViewportEl.classList.remove("dragging");
+  if (event && modalViewportEl.hasPointerCapture(event.pointerId)) {
+    modalViewportEl.releasePointerCapture(event.pointerId);
+  }
+}
+
+modalViewportEl.addEventListener("pointerup", stopDragging);
+modalViewportEl.addEventListener("pointercancel", stopDragging);

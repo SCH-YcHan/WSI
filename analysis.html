@@ -24,6 +24,18 @@
         <p class="hint" id="status-text"></p>
       </div>
     </main>
+    <div class="zoom-modal" id="zoom-modal" hidden>
+      <div class="zoom-modal-head">
+        <span class="zoom-modal-scale" id="zoom-scale-label">100%</span>
+        <button class="btn ghost" id="zoom-close" type="button">닫기</button>
+      </div>
+      <div class="zoom-modal-viewport" id="zoom-viewport">
+        <div class="zoom-modal-content" id="zoom-content">
+          <img id="zoom-image" alt="Zoom Sample" />
+          <svg id="zoom-overlay" class="analysis-overlay" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+    </div>
     <script src="analysis.js"></script>
   </body>
 </html>
