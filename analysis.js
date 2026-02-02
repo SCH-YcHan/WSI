@@ -132,8 +132,9 @@ function clamp(value, min, max) {
 function clampPan() {
   const viewportW = modalViewportEl.clientWidth;
   const viewportH = modalViewportEl.clientHeight;
-  const scaledW = modalImageEl.naturalWidth * modalBaseScale * modalZoom;
-  const scaledH = modalImageEl.naturalHeight * modalBaseScale * modalZoom;
+  const scale = modalBaseScale * modalZoom;
+  const scaledW = modalImageEl.naturalWidth * scale;
+  const scaledH = modalImageEl.naturalHeight * scale;
 
   if (scaledW <= viewportW) {
     modalPanX = (viewportW - scaledW) / 2;
@@ -149,9 +150,13 @@ function clampPan() {
 }
 
 function renderModalTransform() {
+  const scale = modalBaseScale * modalZoom;
+  const scaledW = modalImageEl.naturalWidth * scale;
+  const scaledH = modalImageEl.naturalHeight * scale;
   clampPan();
-  const totalScale = modalBaseScale * modalZoom;
-  modalContentEl.style.transform = `translate(${modalPanX}px, ${modalPanY}px) scale(${totalScale})`;
+  modalContentEl.style.width = `${scaledW}px`;
+  modalContentEl.style.height = `${scaledH}px`;
+  modalContentEl.style.transform = `translate(${modalPanX}px, ${modalPanY}px)`;
   modalScaleLabelEl.textContent = `${Math.round(modalZoom * 100)}%`;
 }
 

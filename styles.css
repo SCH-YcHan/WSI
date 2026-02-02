@@ -94,8 +94,9 @@ a { color: inherit; text-decoration: none; }
 .zoom-modal-controls .btn { min-width: 42px; padding: 9px 12px; }
 .zoom-modal-viewport { position: relative; overflow: hidden; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.2); background: #0a0c0e; cursor: grab; touch-action: none; }
 .zoom-modal-viewport.dragging { cursor: grabbing; }
-.zoom-modal-content { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
-.zoom-modal-content img { display: block; user-select: none; -webkit-user-drag: none; }
+.zoom-modal-content { position: absolute; top: 0; left: 0; }
+.zoom-modal-content img { width: 100%; height: 100%; display: block; user-select: none; -webkit-user-drag: none; }
+.zoom-modal-content .analysis-overlay { width: 100%; height: 100%; }
 body.zoom-open { overflow: hidden; }
 
 @media (max-width: 900px) {
