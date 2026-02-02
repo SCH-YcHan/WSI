@@ -215,6 +215,7 @@ function setDrawHelp(text) {
 
 function renderDrawOverlay() {
   modalDrawOverlayEl.setAttribute("viewBox", `0 0 ${modalImageEl.naturalWidth} ${modalImageEl.naturalHeight}`);
+  const hitboxMarkup = `<rect class="draw-hitbox" x="0" y="0" width="${modalImageEl.naturalWidth}" height="${modalImageEl.naturalHeight}"></rect>`;
   const polygonsMarkup = userPolygons
     .map((polygon) => {
       const className = polygon.id === selectedPolygonId ? "draw-poly selected" : "draw-poly";
@@ -246,7 +247,7 @@ function renderDrawOverlay() {
           .join("")
       : "";
 
-  modalDrawOverlayEl.innerHTML = `${polygonsMarkup}${draftLine}${handlesMarkup}${draftHandles}`;
+  modalDrawOverlayEl.innerHTML = `${hitboxMarkup}${polygonsMarkup}${draftLine}${handlesMarkup}${draftHandles}`;
   modalDrawOverlayEl.style.display = drawMode ? "block" : "none";
 }
 
