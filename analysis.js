@@ -63,25 +63,36 @@ function forEachPoint(featureCollection, cb) {
   });
 }
 
-function detectGeoCanvasSize(featureCollection) {
+function detectGeoBounds(featureCollection) {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
   let maxX = 0;
   let maxY = 0;
   forEachPoint(featureCollection, (x, y) => {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
     if (x > maxX) maxX = x;
     if (y > maxY) maxY = y;
   });
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+    return { minX: 0, minY: 0, width: 1, height: 1 };
+  }
+
   return {
-    width: Math.max(1, Math.ceil(maxX)),
-    height: Math.max(1, Math.ceil(maxY)),
+    minX,
+    minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
   };
 }
 
-function buildMappedPath(rings, scaleX, scaleY) {
+function buildMappedPath(rings, minX, minY, scaleX, scaleY) {
   return rings
     .map(
       (ring) =>
         ring
-          .map((point, index) => `${index === 0 ? "M" : "L"}${point[0] * scaleX} ${point[1] * scaleY}`)
+          .map((point, index) => `${index === 0 ? "M" : "L"}${(point[0] - minX) * scaleX} ${(point[1] - minY) * scaleY}`)
           .join(" ") + " Z"
     )
     .join(" ");
@@ -120,19 +131,19 @@ async function loadOverlay() {
     const res = await fetch(sample.geojson);
     if (!res.ok) throw new Error("geojson load failed");
     const data = await res.json();
-    const geoCanvas = detectGeoCanvasSize(data);
-    const scaleX = imageEl.naturalWidth / geoCanvas.width;
-    const scaleY = imageEl.naturalHeight / geoCanvas.height;
+    const geoBounds = detectGeoBounds(data);
+    const scaleX = imageEl.naturalWidth / geoBounds.width;
+    const scaleY = imageEl.naturalHeight / geoBounds.height;
     overlayEl.setAttribute("viewBox", `0 0 ${imageEl.naturalWidth} ${imageEl.naturalHeight}`);
     const paths = [];
     data.features.forEach((feature) => {
       const geometry = feature.geometry;
       if (!geometry) return;
       if (geometry.type === "Polygon") {
-        paths.push(buildMappedPath(geometry.coordinates, scaleX, scaleY));
+        paths.push(buildMappedPath(geometry.coordinates, geoBounds.minX, geoBounds.minY, scaleX, scaleY));
       } else {
         geometry.coordinates.forEach((polygon) => {
-          paths.push(buildMappedPath(polygon, scaleX, scaleY));
+          paths.push(buildMappedPath(polygon, geoBounds.minX, geoBounds.minY, scaleX, scaleY));
         });
       }
     });
