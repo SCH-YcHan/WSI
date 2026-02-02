@@ -61,7 +61,13 @@ const modalViewportEl = document.getElementById("zoom-viewport");
 const modalContentEl = document.getElementById("zoom-content");
 const modalImageEl = document.getElementById("zoom-image");
 const modalOverlayEl = document.getElementById("zoom-overlay");
+const modalDrawOverlayEl = document.getElementById("zoom-draw-overlay");
 const modalScaleLabelEl = document.getElementById("zoom-scale-label");
+const drawToggleEl = document.getElementById("draw-toggle");
+const drawCloseEl = document.getElementById("draw-close");
+const drawDeleteEl = document.getElementById("draw-delete");
+const drawSaveEl = document.getElementById("draw-save");
+const zoomHelpEl = document.getElementById("zoom-help");
 
 let overlayLoaded = false;
 let overlayVisible = false;
@@ -77,6 +83,12 @@ let dragStartY = 0;
 const activePointers = new Map();
 let pinchStartDistance = 0;
 let pinchStartZoom = 1;
+let drawMode = false;
+let draftPoints = [];
+let userPolygons = [];
+let selectedPolygonId = null;
+let dragVertex = null;
+let polygonIdSeed = 1;
 
 function setError(text) {
   titleEl.textContent = "이미지를 찾을 수 없습니다.";
@@ -172,6 +184,153 @@ function zoomAt(nextZoom, cursorX, cursorY) {
   renderModalTransform();
 }
 
+function imageToSource(point) {
+  return {
+    x: (point.x * sample.sourceWidth) / modalImageEl.naturalWidth,
+    y: (point.y * sample.sourceHeight) / modalImageEl.naturalHeight,
+  };
+}
+
+function pointsToPath(points, closed = true) {
+  if (!points.length) return "";
+  const start = `M${points[0].x} ${points[0].y}`;
+  const body = points.slice(1).map((point) => `L${point.x} ${point.y}`).join(" ");
+  return `${start} ${body}${closed ? " Z" : ""}`;
+}
+
+function getClientToImagePoint(clientX, clientY) {
+  const rect = modalViewportEl.getBoundingClientRect();
+  const localX = clientX - rect.left;
+  const localY = clientY - rect.top;
+  const scale = modalBaseScale * modalZoom;
+  return {
+    x: clamp((localX - modalPanX) / scale, 0, modalImageEl.naturalWidth),
+    y: clamp((localY - modalPanY) / scale, 0, modalImageEl.naturalHeight),
+  };
+}
+
+function setDrawHelp(text) {
+  zoomHelpEl.textContent = text;
+}
+
+function renderDrawOverlay() {
+  modalDrawOverlayEl.setAttribute("viewBox", `0 0 ${modalImageEl.naturalWidth} ${modalImageEl.naturalHeight}`);
+  const polygonsMarkup = userPolygons
+    .map((polygon) => {
+      const className = polygon.id === selectedPolygonId ? "draw-poly selected" : "draw-poly";
+      const pointsText = polygon.points.map((point) => `${point.x},${point.y}`).join(" ");
+      return `<polygon class="${className}" data-poly-id="${polygon.id}" points="${pointsText}"></polygon>`;
+    })
+    .join("");
+
+  const handlesMarkup = userPolygons
+    .flatMap((polygon) =>
+      polygon.points.map(
+        (point, index) =>
+          `<circle class="draw-handle" data-poly-id="${polygon.id}" data-vertex-index="${index}" r="6" cx="${point.x}" cy="${point.y}"></circle>`
+      )
+    )
+    .join("");
+
+  const draftLine =
+    drawMode && draftPoints.length
+      ? `<path class="draft-line" d="${pointsToPath(draftPoints, false)}"></path>`
+      : "";
+  const draftHandles =
+    drawMode && draftPoints.length
+      ? draftPoints
+          .map((point, index) => {
+            const closeClass = index === 0 && draftPoints.length >= 3 ? " close-target" : "";
+            return `<circle class="draw-handle${closeClass}" data-draft-index="${index}" r="6" cx="${point.x}" cy="${point.y}"></circle>`;
+          })
+          .join("")
+      : "";
+
+  modalDrawOverlayEl.innerHTML = `${polygonsMarkup}${draftLine}${handlesMarkup}${draftHandles}`;
+  modalDrawOverlayEl.style.display = drawMode ? "block" : "none";
+}
+
+function setDrawMode(next) {
+  drawMode = next;
+  drawToggleEl.textContent = drawMode ? "그리기 ON" : "그리기 OFF";
+  setDrawHelp(
+    drawMode
+      ? "그리기 ON: 탭으로 점 추가, 첫 점 탭 또는 '폴리곤 닫기'로 완료, 점 드래그로 수정"
+      : "그리기 OFF: 이동/확대 모드"
+  );
+  if (!drawMode) {
+    draftPoints = [];
+    dragVertex = null;
+  }
+  renderDrawOverlay();
+}
+
+function closeDraftPolygon() {
+  if (draftPoints.length < 3) {
+    setDrawHelp("점 3개 이상 필요합니다.");
+    return;
+  }
+  userPolygons.push({ id: polygonIdSeed++, points: draftPoints.map((point) => ({ ...point })) });
+  selectedPolygonId = userPolygons[userPolygons.length - 1].id;
+  draftPoints = [];
+  setDrawHelp("폴리곤이 추가되었습니다.");
+  renderDrawOverlay();
+}
+
+function deleteSelectedPolygon() {
+  if (selectedPolygonId == null) {
+    setDrawHelp("삭제할 폴리곤을 먼저 선택하세요.");
+    return;
+  }
+  userPolygons = userPolygons.filter((polygon) => polygon.id !== selectedPolygonId);
+  selectedPolygonId = null;
+  setDrawHelp("선택한 폴리곤을 삭제했습니다.");
+  renderDrawOverlay();
+}
+
+function saveUserPolygons() {
+  if (!userPolygons.length) {
+    setDrawHelp("저장할 폴리곤이 없습니다.");
+    return;
+  }
+  const featureCollection = {
+    type: "FeatureCollection",
+    metadata: {
+      source: sample.title,
+      slug,
+      createdAt: new Date().toISOString(),
+      note: "User annotations exported separately from original geojson",
+    },
+    features: userPolygons.map((polygon) => ({
+      type: "Feature",
+      properties: { objectType: "user-annotation", polygonId: polygon.id },
+      geometry: {
+        type: "Polygon",
+        coordinates: [[...polygon.points.map((point) => {
+          const source = imageToSource(point);
+          return [Number(source.x.toFixed(3)), Number(source.y.toFixed(3))];
+        }), (() => {
+          const first = imageToSource(polygon.points[0]);
+          return [Number(first.x.toFixed(3)), Number(first.y.toFixed(3))];
+        })()]],
+      },
+    })),
+  };
+
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "").replace("T", "-");
+  const filename = `${slug}-user-annotations-${stamp}.geojson`;
+  const blob = new Blob([JSON.stringify(featureCollection, null, 2)], { type: "application/geo+json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+  setDrawHelp(`저장 완료: ${filename}`);
+}
+
 function renderOverlayInto(svgEl, imgEl) {
   svgEl.setAttribute("viewBox", `0 0 ${imgEl.naturalWidth} ${imgEl.naturalHeight}`);
   svgEl.innerHTML = overlayMarkup;
@@ -197,12 +356,15 @@ async function openZoomModal() {
   modalPanX = (viewportW - modalImageEl.naturalWidth * modalBaseScale) / 2;
   modalPanY = (viewportH - modalImageEl.naturalHeight * modalBaseScale) / 2;
   renderModalTransform();
+  renderDrawOverlay();
 }
 
 function closeZoomModal() {
   modalEl.hidden = true;
   document.body.classList.remove("zoom-open");
   isDragging = false;
+  activePointers.clear();
+  dragVertex = null;
   modalViewportEl.classList.remove("dragging");
 }
 
@@ -257,6 +419,8 @@ if (!sample) {
   imageEl.src = sample.image;
 }
 
+setDrawMode(false);
+
 wrapEl.addEventListener("click", () => {
   openZoomModal();
 });
@@ -303,10 +467,63 @@ function pointerMidpoint(p1, p2) {
   return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
 }
 
+drawToggleEl.addEventListener("click", () => {
+  setDrawMode(!drawMode);
+});
+
+drawCloseEl.addEventListener("click", () => {
+  closeDraftPolygon();
+});
+
+drawDeleteEl.addEventListener("click", () => {
+  deleteSelectedPolygon();
+});
+
+drawSaveEl.addEventListener("click", () => {
+  saveUserPolygons();
+});
+
+modalDrawOverlayEl.addEventListener("click", (event) => {
+  if (!drawMode) return;
+  const handle = event.target.closest("circle[data-draft-index]");
+  if (handle) {
+    const index = Number(handle.dataset.draftIndex);
+    if (index === 0 && draftPoints.length >= 3) {
+      closeDraftPolygon();
+      return;
+    }
+  }
+
+  const poly = event.target.closest("[data-poly-id]");
+  if (poly) {
+    selectedPolygonId = Number(poly.dataset.polyId);
+    renderDrawOverlay();
+    return;
+  }
+
+  const point = getClientToImagePoint(event.clientX, event.clientY);
+  draftPoints.push(point);
+  selectedPolygonId = null;
+  renderDrawOverlay();
+});
+
 modalViewportEl.addEventListener("pointerdown", (event) => {
   if (modalEl.hidden) return;
+  if (drawMode) {
+    const vertex = event.target.closest("circle[data-poly-id][data-vertex-index]");
+    if (vertex) {
+      dragVertex = {
+        polyId: Number(vertex.dataset.polyId),
+        vertexIndex: Number(vertex.dataset.vertexIndex),
+        pointerId: event.pointerId,
+      };
+      event.preventDefault();
+      modalViewportEl.setPointerCapture(event.pointerId);
+      return;
+    }
+  }
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  if (activePointers.size === 1) {
+  if (activePointers.size === 1 && !drawMode) {
     isDragging = true;
     dragStartX = event.clientX;
     dragStartY = event.clientY;
@@ -323,6 +540,17 @@ modalViewportEl.addEventListener("pointerdown", (event) => {
 
 modalViewportEl.addEventListener("pointermove", (event) => {
   if (modalEl.hidden) return;
+
+  if (dragVertex && dragVertex.pointerId === event.pointerId) {
+    const polygon = userPolygons.find((item) => item.id === dragVertex.polyId);
+    if (polygon && polygon.points[dragVertex.vertexIndex]) {
+      polygon.points[dragVertex.vertexIndex] = getClientToImagePoint(event.clientX, event.clientY);
+      selectedPolygonId = polygon.id;
+      renderDrawOverlay();
+    }
+    return;
+  }
+
   if (activePointers.has(event.pointerId)) {
     activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   }
@@ -337,7 +565,7 @@ modalViewportEl.addEventListener("pointermove", (event) => {
     return;
   }
 
-  if (!isDragging || activePointers.size !== 1) return;
+  if (!isDragging || activePointers.size !== 1 || drawMode) return;
   const dx = event.clientX - dragStartX;
   const dy = event.clientY - dragStartY;
   dragStartX = event.clientX;
@@ -348,11 +576,19 @@ modalViewportEl.addEventListener("pointermove", (event) => {
 });
 
 function stopDragging(event) {
+  if (dragVertex && event.pointerId === dragVertex.pointerId) {
+    dragVertex = null;
+    if (modalViewportEl.hasPointerCapture(event.pointerId)) {
+      modalViewportEl.releasePointerCapture(event.pointerId);
+    }
+    return;
+  }
+
   activePointers.delete(event.pointerId);
   if (activePointers.size < 2) {
     pinchStartDistance = 0;
   }
-  if (activePointers.size === 1) {
+  if (activePointers.size === 1 && !drawMode) {
     const [pointer] = [...activePointers.values()];
     isDragging = true;
     dragStartX = pointer.x;

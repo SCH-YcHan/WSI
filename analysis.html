@@ -28,6 +28,10 @@
       <div class="zoom-modal-head">
         <span class="zoom-modal-scale" id="zoom-scale-label">100%</span>
         <div class="zoom-modal-controls">
+          <button class="btn ghost" id="draw-toggle" type="button">그리기 OFF</button>
+          <button class="btn ghost" id="draw-close" type="button">폴리곤 닫기</button>
+          <button class="btn ghost" id="draw-delete" type="button">선택 삭제</button>
+          <button class="btn ghost" id="draw-save" type="button">새 파일 저장</button>
           <button class="btn ghost" id="zoom-out" type="button">-</button>
           <button class="btn ghost" id="zoom-in" type="button">+</button>
           <button class="btn ghost" id="zoom-close" type="button">닫기</button>
@@ -37,8 +41,10 @@
         <div class="zoom-modal-content" id="zoom-content">
           <img id="zoom-image" alt="Zoom Sample" />
           <svg id="zoom-overlay" class="analysis-overlay" preserveAspectRatio="none"></svg>
+          <svg id="zoom-draw-overlay" class="analysis-overlay zoom-draw-overlay" preserveAspectRatio="none"></svg>
         </div>
       </div>
+      <p class="zoom-modal-help" id="zoom-help">그리기 OFF: 이동/확대 모드</p>
     </div>
     <script src="analysis.js"></script>
   </body>
