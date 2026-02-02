@@ -55,6 +55,8 @@ const toggleEl = document.getElementById("toggle-overlay");
 const statusEl = document.getElementById("status-text");
 const modalEl = document.getElementById("zoom-modal");
 const modalCloseEl = document.getElementById("zoom-close");
+const modalZoomInEl = document.getElementById("zoom-in");
+const modalZoomOutEl = document.getElementById("zoom-out");
 const modalViewportEl = document.getElementById("zoom-viewport");
 const modalContentEl = document.getElementById("zoom-content");
 const modalImageEl = document.getElementById("zoom-image");
@@ -72,6 +74,9 @@ let modalPanY = 0;
 let isDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
+const activePointers = new Map();
+let pinchStartDistance = 0;
+let pinchStartZoom = 1;
 
 function setError(text) {
   titleEl.textContent = "이미지를 찾을 수 없습니다.";
@@ -148,6 +153,18 @@ function renderModalTransform() {
   const totalScale = modalBaseScale * modalZoom;
   modalContentEl.style.transform = `translate(${modalPanX}px, ${modalPanY}px) scale(${totalScale})`;
   modalScaleLabelEl.textContent = `${Math.round(modalZoom * 100)}%`;
+}
+
+function zoomAt(nextZoom, cursorX, cursorY) {
+  const currentScale = modalBaseScale * modalZoom;
+  const worldX = (cursorX - modalPanX) / currentScale;
+  const worldY = (cursorY - modalPanY) / currentScale;
+  const clampedZoom = clamp(nextZoom, 1, 4);
+  const nextScale = modalBaseScale * clampedZoom;
+  modalPanX = cursorX - worldX * nextScale;
+  modalPanY = cursorY - worldY * nextScale;
+  modalZoom = clampedZoom;
+  renderModalTransform();
 }
 
 function renderOverlayInto(svgEl, imgEl) {
@@ -271,30 +288,54 @@ modalViewportEl.addEventListener(
     const rect = modalViewportEl.getBoundingClientRect();
     const cursorX = event.clientX - rect.left;
     const cursorY = event.clientY - rect.top;
-    const currentScale = modalBaseScale * modalZoom;
-    const worldX = (cursorX - modalPanX) / currentScale;
-    const worldY = (cursorY - modalPanY) / currentScale;
-    const nextZoom = clamp(modalZoom * (event.deltaY < 0 ? 1.1 : 0.9), 1, 4);
-    const nextScale = modalBaseScale * nextZoom;
-    modalPanX = cursorX - worldX * nextScale;
-    modalPanY = cursorY - worldY * nextScale;
-    modalZoom = nextZoom;
-    renderModalTransform();
+    zoomAt(modalZoom * (event.deltaY < 0 ? 1.1 : 0.9), cursorX, cursorY);
   },
   { passive: false }
 );
 
+function pointerDistance(p1, p2) {
+  return Math.hypot(p2.x - p1.x, p2.y - p1.y);
+}
+
+function pointerMidpoint(p1, p2) {
+  return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+}
+
 modalViewportEl.addEventListener("pointerdown", (event) => {
   if (modalEl.hidden) return;
-  isDragging = true;
-  dragStartX = event.clientX;
-  dragStartY = event.clientY;
-  modalViewportEl.classList.add("dragging");
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (activePointers.size === 1) {
+    isDragging = true;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    modalViewportEl.classList.add("dragging");
+  } else if (activePointers.size === 2) {
+    const [p1, p2] = [...activePointers.values()];
+    pinchStartDistance = pointerDistance(p1, p2) || 1;
+    pinchStartZoom = modalZoom;
+    isDragging = false;
+    modalViewportEl.classList.remove("dragging");
+  }
   modalViewportEl.setPointerCapture(event.pointerId);
 });
 
 modalViewportEl.addEventListener("pointermove", (event) => {
-  if (!isDragging || modalEl.hidden) return;
+  if (modalEl.hidden) return;
+  if (activePointers.has(event.pointerId)) {
+    activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  }
+
+  if (activePointers.size === 2) {
+    const [p1, p2] = [...activePointers.values()];
+    const rect = modalViewportEl.getBoundingClientRect();
+    const mid = pointerMidpoint(p1, p2);
+    const currentDistance = pointerDistance(p1, p2) || 1;
+    const nextZoom = pinchStartZoom * (currentDistance / pinchStartDistance);
+    zoomAt(nextZoom, mid.x - rect.left, mid.y - rect.top);
+    return;
+  }
+
+  if (!isDragging || activePointers.size !== 1) return;
   const dx = event.clientX - dragStartX;
   const dy = event.clientY - dragStartY;
   dragStartX = event.clientX;
@@ -305,8 +346,20 @@ modalViewportEl.addEventListener("pointermove", (event) => {
 });
 
 function stopDragging(event) {
-  if (!isDragging) return;
-  isDragging = false;
+  activePointers.delete(event.pointerId);
+  if (activePointers.size < 2) {
+    pinchStartDistance = 0;
+  }
+  if (activePointers.size === 1) {
+    const [pointer] = [...activePointers.values()];
+    isDragging = true;
+    dragStartX = pointer.x;
+    dragStartY = pointer.y;
+    modalViewportEl.classList.add("dragging");
+  } else {
+    isDragging = false;
+    modalViewportEl.classList.remove("dragging");
+  }
   modalViewportEl.classList.remove("dragging");
   if (event && modalViewportEl.hasPointerCapture(event.pointerId)) {
     modalViewportEl.releasePointerCapture(event.pointerId);
@@ -315,3 +368,11 @@ function stopDragging(event) {
 
 modalViewportEl.addEventListener("pointerup", stopDragging);
 modalViewportEl.addEventListener("pointercancel", stopDragging);
+
+modalZoomInEl.addEventListener("click", () => {
+  zoomAt(modalZoom * 1.2, modalViewportEl.clientWidth / 2, modalViewportEl.clientHeight / 2);
+});
+
+modalZoomOutEl.addEventListener("click", () => {
+  zoomAt(modalZoom * 0.8, modalViewportEl.clientWidth / 2, modalViewportEl.clientHeight / 2);
+});
