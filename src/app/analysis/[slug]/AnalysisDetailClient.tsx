@@ -1,46 +1,51 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 
-const samples: Record<string, { title: string; src: string; tif: string }> = {
+type FeatureCollection = {
+  type: "FeatureCollection";
+  features: Array<{
+    geometry: {
+      type: "Polygon" | "MultiPolygon";
+      coordinates: unknown;
+    } | null;
+  }>;
+};
+
+const samples: Record<string, { title: string; src: string; geojson: string }> = {
   "wt1-adenine-x20": {
     title: "WT1 Adenine x20",
-    src: "/analysis-samples/large/wt1-adenine-x20.jpg",
-    tif: "WT1-Adenine_x20.tif",
+    src: "/analysis-samples/hires/wt1-adenine-x20.png",
+    geojson: "/geojson/wt1-adenine-x20.geojson",
   },
   "wt2-adenine-x20": {
     title: "WT2 Adenine x20",
-    src: "/analysis-samples/large/wt2-adenine-x20.jpg",
-    tif: "WT2-Adenine_x20.tif",
+    src: "/analysis-samples/hires/wt2-adenine-x20.png",
+    geojson: "/geojson/wt2-adenine-x20.geojson",
   },
   "wt3-adenine-x20": {
     title: "WT3 Adenine x20",
-    src: "/analysis-samples/large/wt3-adenine-x20.jpg",
-    tif: "WT3-Adenine_x20.tif",
+    src: "/analysis-samples/hires/wt3-adenine-x20.png",
+    geojson: "/geojson/wt3-adenine-x20.geojson",
   },
   "wt4-normal-x20": {
     title: "WT4 Normal x20",
-    src: "/analysis-samples/large/wt4-normal-x20.jpg",
-    tif: "WT4-Normal_x20.tif",
+    src: "/analysis-samples/hires/wt4-normal-x20.png",
+    geojson: "/geojson/wt4-normal-x20.geojson",
   },
   "wt5-normal-x20": {
     title: "WT5 Normal x20",
-    src: "/analysis-samples/large/wt5-normal-x20.jpg",
-    tif: "WT5-Normal_x20.tif",
+    src: "/analysis-samples/hires/wt5-normal-x20.png",
+    geojson: "/geojson/wt5-normal-x20.geojson",
   },
   "wt6-normal-x20": {
     title: "WT6 Normal x20",
-    src: "/analysis-samples/large/wt6-normal-x20.jpg",
-    tif: "WT6-Normal_x20.tif",
+    src: "/analysis-samples/hires/wt6-normal-x20.png",
+    geojson: "/geojson/wt6-normal-x20.geojson",
   },
 };
 
 export default function AnalysisDetailClient({ slug }: { slug: string }) {
-  const router = useRouter();
-  const [checking, setChecking] = useState(true);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
   const [dragging, setDragging] = useState(false);
@@ -50,37 +55,11 @@ export default function AnalysisDetailClient({ slug }: { slug: string }) {
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [overlayLoading, setOverlayLoading] = useState(false);
   const [overlayError, setOverlayError] = useState<string | null>(null);
-  const [overlayData, setOverlayData] = useState<{
-    width: number | null;
-    height: number | null;
-    data: {
-      type: "FeatureCollection";
-      features: Array<{
-        geometry: {
-          type: "Polygon" | "MultiPolygon";
-          coordinates: unknown;
-        } | null;
-      }>;
-    };
-  } | null>(null);
+  const [overlayData, setOverlayData] = useState<FeatureCollection | null>(null);
   const mediaRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
-  const sample = useMemo(
-    () =>
-      samples[slug]
-        ? { ...samples[slug], src: `/analysis-samples/hires/${slug}.png` }
-        : undefined,
-    [slug]
-  );
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) router.replace(`/login?next=/analysis/${slug}`);
-      setChecking(false);
-    });
-    return () => unsub();
-  }, [router, slug]);
+  const sample = useMemo(() => samples[slug], [slug]);
 
   useEffect(() => {
     if (!zoomOpen) return;
@@ -110,7 +89,6 @@ export default function AnalysisDetailClient({ slug }: { slug: string }) {
     setOffset((current) => clampOffset(current));
   }, [zoomScale]);
 
-
   const resetZoom = () => {
     setZoomScale(1);
     setOffset({ x: 0, y: 0 });
@@ -135,17 +113,15 @@ export default function AnalysisDetailClient({ slug }: { slug: string }) {
   };
 
   const loadOverlay = async () => {
-    if (overlayData || overlayLoading) return;
+    if (!sample || overlayData || overlayLoading) return;
     setOverlayLoading(true);
     setOverlayError(null);
     try {
-      const res = await fetch(`/api/analysis/${slug}/geojson`);
-      if (!res.ok) {
-        throw new Error("Failed to load overlay data");
-      }
-      const payload = await res.json();
+      const res = await fetch(sample.geojson);
+      if (!res.ok) throw new Error("Failed to load overlay data");
+      const payload = (await res.json()) as FeatureCollection;
       setOverlayData(payload);
-    } catch (err) {
+    } catch {
       setOverlayError("좌표 데이터를 불러오지 못했습니다.");
       setOverlayOpen(false);
     } finally {
@@ -155,17 +131,18 @@ export default function AnalysisDetailClient({ slug }: { slug: string }) {
 
   const buildPath = (rings: number[][][]) =>
     rings
-      .map((ring) =>
-        ring
-          .map((point, index) => `${index === 0 ? "M" : "L"}${point[0]} ${point[1]}`)
-          .join(" ") + " Z"
+      .map(
+        (ring) =>
+          ring
+            .map((point, index) => `${index === 0 ? "M" : "L"}${point[0]} ${point[1]}`)
+            .join(" ") + " Z"
       )
       .join(" ");
 
   const overlayPaths = useMemo(() => {
-    if (!overlayData) return [];
+    if (!overlayData) return [] as string[];
     const paths: string[] = [];
-    for (const feature of overlayData.data.features) {
+    for (const feature of overlayData.features) {
       const geometry = feature.geometry;
       if (!geometry) continue;
       if (geometry.type === "Polygon") {
@@ -179,16 +156,47 @@ export default function AnalysisDetailClient({ slug }: { slug: string }) {
     return paths;
   }, [overlayData]);
 
-  if (checking) {
-    return (
-      <main className="analysis-detail">
-        <div className="analysis-detail-card">
-          <div className="skeleton line" />
-          <div className="skeleton block" />
-        </div>
-      </main>
-    );
-  }
+  const overlayBounds = useMemo(() => {
+    if (!overlayData) return { minX: 0, minY: 0, width: 1, height: 1 };
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    const pushPoint = (x: number, y: number) => {
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    };
+
+    for (const feature of overlayData.features) {
+      const geometry = feature.geometry;
+      if (!geometry) continue;
+      if (geometry.type === "Polygon") {
+        for (const ring of geometry.coordinates as number[][][]) {
+          for (const [x, y] of ring) pushPoint(x, y);
+        }
+      } else if (geometry.type === "MultiPolygon") {
+        for (const polygon of geometry.coordinates as number[][][][]) {
+          for (const ring of polygon) {
+            for (const [x, y] of ring) pushPoint(x, y);
+          }
+        }
+      }
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return { minX: 0, minY: 0, width: 1, height: 1 };
+    }
+
+    return {
+      minX,
+      minY,
+      width: Math.max(1, maxX - minX),
+      height: Math.max(1, maxY - minY),
+    };
+  }, [overlayData]);
 
   if (!sample) {
     return (
@@ -219,7 +227,7 @@ export default function AnalysisDetailClient({ slug }: { slug: string }) {
             {overlayOpen && overlayData && (
               <svg
                 className="analysis-overlay"
-                viewBox={`0 0 ${overlayData.width ?? 1} ${overlayData.height ?? 1}`}
+                viewBox={`${overlayBounds.minX} ${overlayBounds.minY} ${overlayBounds.width} ${overlayBounds.height}`}
                 preserveAspectRatio="xMidYMid meet"
               >
                 {overlayPaths.map((d, index) => (
@@ -251,9 +259,6 @@ export default function AnalysisDetailClient({ slug }: { slug: string }) {
           >
             {overlayOpen ? "객체 숨기기" : "객체 보기"}
           </button>
-          <a className="btn" href={`/api/analysis/${slug}/download`}>
-            원본 TIFF 다운로드
-          </a>
           {overlayLoading && <span className="hint">객체 로딩 중...</span>}
           {overlayError && <span className="status error">{overlayError}</span>}
         </div>
@@ -328,7 +333,7 @@ export default function AnalysisDetailClient({ slug }: { slug: string }) {
                   {overlayOpen && overlayData && (
                     <svg
                       className="analysis-overlay zoom-overlay-layer"
-                      viewBox={`0 0 ${overlayData.width ?? 1} ${overlayData.height ?? 1}`}
+                      viewBox={`${overlayBounds.minX} ${overlayBounds.minY} ${overlayBounds.width} ${overlayBounds.height}`}
                       preserveAspectRatio="xMidYMid meet"
                     >
                       {overlayPaths.map((d, index) => (

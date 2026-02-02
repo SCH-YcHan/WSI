@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Source_Sans_3, Space_Mono } from "next/font/google";
 import "./globals.css";
-import AuthStatus from "@/components/AuthStatus";
 
 const displayFont = Cormorant_Garamond({
   variable: "--font-display",
@@ -22,8 +21,8 @@ const monoFont = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WSI Pathology Analysis",
-  description: "Whole-slide pathology data intake and analysis dashboard.",
+  title: "WSI Analysis Examples",
+  description: "Static showcase of WSI analysis example results.",
 };
 
 export default function RootLayout({
@@ -33,14 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} antialiased`}
-      >
-        <a className="home-link" href="/">
-          <span className="home-link-dot" />
-          WSI Home
-        </a>
-        <AuthStatus />
+      <body className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} antialiased`}>
         {children}
       </body>
     </html>

@@ -1,122 +1,13 @@
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { useRouter } from "next/navigation";
-
-type Job = {
-  sessionId: string;
-  state?: string;
-  createdAt?: { seconds?: number; nanoseconds?: number };
-  input?: { fileName?: string; fileSize?: number };
-};
-
-function formatBytes(bytes: number) {
-  if (!bytes || bytes <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const idx = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / Math.pow(1024, idx);
-  return `${value.toFixed(value >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`;
-}
-
-function stateTone(state?: string) {
-  const s = (state || "").toUpperCase();
-  if (s === "FAILED") return "bad";
-  if (s === "COMPLETED") return "good";
-  if (s === "UPLOADED") return "pending";
-  return "neutral";
-}
+const samples = [
+  "wt1-adenine-x20",
+  "wt2-adenine-x20",
+  "wt3-adenine-x20",
+  "wt4-normal-x20",
+  "wt5-normal-x20",
+  "wt6-normal-x20",
+];
 
 export default function Home() {
-  const router = useRouter();
-  const [uid, setUid] = useState<string | null>(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [error, setError] = useState<string>("");
-  const [latestPredictState, setLatestPredictState] = useState<string | null>(null);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUid(u?.uid ?? null);
-      setCheckingAuth(false);
-    });
-    return () => unsub();
-  }, []);
-
-  const handleProtectedNav = (path: string) => {
-    if (checkingAuth) return;
-    if (uid) router.push(path);
-    else router.push(`/login?next=${encodeURIComponent(path)}`);
-  };
-
-  useEffect(() => {
-    if (!uid) {
-      setJobs([]);
-      setError("");
-      return;
-    }
-    const q = query(collection(db, "users", uid, "jobs"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setError("");
-        setJobs(snap.docs.map((d) => d.data() as Job));
-      },
-      (err) => {
-        setJobs([]);
-        setError(
-          err?.code === "permission-denied"
-            ? "Firestore 접근 권한이 없습니다. 로그인 상태와 보안 규칙을 확인하세요."
-            : "작업 데이터를 불러오지 못했습니다."
-        );
-      }
-    );
-    return () => unsub();
-  }, [uid]);
-
-  const metrics = useMemo(() => {
-    const totalJobs = jobs.length;
-    const totalBytes = jobs.reduce((acc, j) => acc + (j.input?.fileSize ?? 0), 0);
-    const failedJobs = jobs.filter((j) => j.state === "FAILED").length;
-    const latestState = jobs[0]?.state ?? (uid ? "NO_JOBS" : "SIGNED_OUT");
-    return { totalJobs, totalBytes, failedJobs, latestState };
-  }, [jobs, uid]);
-
-  const latestJob = useMemo(() => {
-    if (jobs.length === 0) return undefined;
-    return [...jobs].sort((a, b) => {
-      const aSec = a.createdAt?.seconds ?? 0;
-      const bSec = b.createdAt?.seconds ?? 0;
-      return bSec - aSec;
-    })[0];
-  }, [jobs]);
-
-  useEffect(() => {
-    if (!latestJob?.sessionId) {
-      setLatestPredictState(null);
-      return;
-    }
-    let timer: number | null = null;
-    const poll = async () => {
-      try {
-        const res = await fetch(`/api/workspace/${latestJob.sessionId}/progress`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setLatestPredictState(data?.state ?? null);
-      } catch {
-        // ignore
-      } finally {
-        timer = window.setTimeout(poll, 4000);
-      }
-    };
-    poll();
-    return () => {
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [latestJob?.sessionId]);
-
   return (
     <main className="page">
       <section className="hero">
@@ -127,62 +18,37 @@ export default function Home() {
             <span className="hero-headline-line">병리를 진단합니다</span>
           </h1>
           <p>
-            <span className="hero-line">
-              슬라이드 수집부터 품질 관리, 조직 구조 분석, 리포팅까지.
-            </span>
-            <span className="hero-line">
-              임상·연구 환경에 최적화된 전 과정을 한 화면에서 관리합니다.
-            </span>
+            <span className="hero-line">슬라이드 수집부터 품질 관리, 조직 구조 분석, 리포팅까지.</span>
+            <span className="hero-line">임상·연구 환경에 최적화된 전 과정을 한 화면에서 보여줍니다.</span>
           </p>
           <div className="cta-row">
-            <a
-              className="cta primary"
-              href="/upload"
-              onClick={(e) => {
-                e.preventDefault();
-                handleProtectedNav("/upload");
-              }}
-            >
-              슬라이드 업로드
+            <a className="cta primary" href="#samples">
+              분석 예시 보기
             </a>
-            <a
-              className="cta ghost"
-              href="/jobs"
-              onClick={(e) => {
-                e.preventDefault();
-                handleProtectedNav("/jobs");
-              }}
-            >
-              작업 현황 보기
+            <a className="cta ghost" href="/analysis-samples/hires/wt2-adenine-x20.png" target="_blank" rel="noreferrer">
+              대표 고해상도 열기
             </a>
           </div>
         </div>
         <div className="hero-card">
           <div className="signal">Run Status</div>
-          <p>
-            {uid
-              ? "업로드된 슬라이드와 분석 상태를 실시간으로 모니터링합니다."
-              : checkingAuth
-                ? "세션을 확인 중입니다."
-                : "로그인하면 개인 작업 상태와 업로드 통계를 확인할 수 있습니다."}
-          </p>
-          {error && <p style={{ color: "#9a2f2f", marginTop: 8 }}>{error}</p>}
+          <p>실시간 분석 기능은 제거했으며, 현재는 예시 결과 이미지만 제공합니다.</p>
           <div className="metrics">
             <div className="metric">
-              <strong>{metrics.totalJobs}</strong>
-              <span>Total Jobs</span>
+              <strong>6</strong>
+              <span>Example Slides</span>
             </div>
             <div className="metric">
-              <strong>{formatBytes(metrics.totalBytes)}</strong>
-              <span>Uploaded Size</span>
+              <strong>Static</strong>
+              <span>Deployment Mode</span>
             </div>
             <div className="metric">
-              <strong>{metrics.failedJobs}</strong>
-              <span>Failed Jobs</span>
+              <strong>JPG + PNG</strong>
+              <span>Available Formats</span>
             </div>
             <div className="metric">
-              <strong>{metrics.latestState}</strong>
-              <span>Latest State</span>
+              <strong>Ready</strong>
+              <span>Public Access</span>
             </div>
           </div>
         </div>
@@ -193,77 +59,44 @@ export default function Home() {
           <div className="section-kicker">Workspace</div>
           <h2>내 분석 공간</h2>
         </div>
-        <p>최근 업로드한 슬라이드로 바로 이동해 확인하고 분석을 진행할 수 있습니다.</p>
+        <p>기존 워크스페이스 구성은 유지하되, 실제 동작은 예시 결과 열람 중심으로 단순화했습니다.</p>
       </section>
       <section className="workspace-entry-grid">
         <div className="card workspace-entry-card">
           <div className="workspace-entry-head">
             <div>
               <div className="signal">Latest Session</div>
-              <h3>{latestJob?.sessionId ?? "최근 업로드 없음"}</h3>
+              <h3>Sample Session</h3>
             </div>
-            {uid && latestJob?.state && (
-              <span
-                className={`badge ${
-                  latestPredictState && latestPredictState !== "idle"
-                    ? stateTone(
-                        latestPredictState === "done"
-                          ? "COMPLETED"
-                          : latestPredictState === "failed" || latestPredictState === "cancelled"
-                            ? "FAILED"
-                            : "PROCESSING"
-                      )
-                    : stateTone(latestJob.state)
-                }`}
-              >
-                {latestPredictState && latestPredictState !== "idle"
-                  ? latestPredictState.toUpperCase()
-                  : latestJob.state}
-              </span>
-            )}
+            <span className="badge good">READY</span>
           </div>
           <div className="workspace-entry-meta">
             <div>
               <span>파일명</span>
-              <strong>{latestJob?.input?.fileName ?? "-"}</strong>
+              <strong>wt2-adenine-x20</strong>
             </div>
             <div>
-              <span>업로드 용량</span>
-              <strong>{latestJob?.input?.fileSize ? formatBytes(latestJob.input.fileSize) : "-"}</strong>
+              <span>상태</span>
+              <strong>예시 결과 확인 가능</strong>
             </div>
           </div>
           <div className="workspace-entry-actions">
-            <button
-              className="btn primary"
-              onClick={() => {
-                if (!uid) return handleProtectedNav("/jobs");
-                if (latestJob?.sessionId) handleProtectedNav(`/workspace/${latestJob.sessionId}`);
-                else handleProtectedNav("/upload");
-              }}
-            >
-              분석 공간 열기
-            </button>
-            <button
-              className="btn ghost"
-              onClick={() => handleProtectedNav("/jobs")}
-            >
-              작업 목록
-            </button>
+            <a className="btn primary" href="#samples">
+              분석 결과 열기
+            </a>
+            <a className="btn ghost" href="/analysis/wt2-adenine-x20">
+              상세 보기
+            </a>
           </div>
         </div>
         <div className="card workspace-entry-card">
           <div className="signal">Quick Start</div>
-          <h3>새 슬라이드 분석</h3>
-          <p className="hint">
-            아직 업로드한 슬라이드가 없나요? 바로 업로드하고 분석을 시작하세요.
-          </p>
+          <h3>샘플 고해상도 이미지</h3>
+          <p className="hint">고해상도 PNG 결과를 새 탭에서 바로 열어 확대해 확인할 수 있습니다.</p>
           <div className="workspace-entry-actions">
-            <button
-              className="btn"
-              onClick={() => handleProtectedNav("/upload")}
-            >
-              슬라이드 업로드
-            </button>
+            <a className="btn" href="/analysis-samples/hires/wt1-adenine-x20.png" target="_blank" rel="noreferrer">
+              High-Res 열기
+            </a>
           </div>
         </div>
       </section>
@@ -273,7 +106,7 @@ export default function Home() {
           <div className="section-kicker">Platform Overview</div>
           <h2>워크플로우 구성</h2>
         </div>
-        <p>데이터 수집부터 분석 결과 공유까지, 병리 데이터 파이프라인을 모듈로 제공합니다.</p>
+        <p>데이터 수집부터 결과 공유까지의 전체 구성은 화면에서 그대로 확인할 수 있습니다.</p>
       </section>
       <section className="panel-grid">
         <div className="panel">
@@ -299,7 +132,7 @@ export default function Home() {
           <div className="section-kicker">Execution Flow</div>
           <h2>분석 파이프라인</h2>
         </div>
-        <p>표준화된 4단계 흐름으로 분석 품질과 재현성을 확보합니다.</p>
+        <p>표준화된 4단계 흐름을 UI 상에서 확인할 수 있습니다.</p>
       </section>
       <section className="pipeline">
         <div className="step">
@@ -324,29 +157,18 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="analysis-preview">
+      <section className="analysis-preview" id="samples">
         <div className="analysis-head">
           <div className="section-kicker">Analysis Sample</div>
           <h2>분석 예시 이미지</h2>
-          <p>대표 슬라이드에 대한 분석 결과 예시를 확인할 수 있습니다.</p>
+          <p>샘플 썸네일, 대형 JPG, 고해상도 PNG를 직접 열어 결과만 확인할 수 있습니다.</p>
         </div>
         <div className="analysis-grid">
-          {[
-            "wt1-adenine-x20",
-            "wt2-adenine-x20",
-            "wt3-adenine-x20",
-            "wt4-normal-x20",
-            "wt5-normal-x20",
-            "wt6-normal-x20",
-          ].map((id, idx) => (
+          {samples.map((id, idx) => (
             <a
               className="analysis-tile"
               key={id}
               href={`/analysis/${id}`}
-              onClick={(e) => {
-                e.preventDefault();
-                handleProtectedNav(`/analysis/${id}`);
-              }}
             >
               <img src={`/analysis-samples/${id}.jpg`} alt={`Analysis sample ${idx + 1}`} />
             </a>
