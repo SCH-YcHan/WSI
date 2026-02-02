@@ -164,7 +164,7 @@ function zoomAt(nextZoom, cursorX, cursorY) {
   const currentScale = modalBaseScale * modalZoom;
   const worldX = (cursorX - modalPanX) / currentScale;
   const worldY = (cursorY - modalPanY) / currentScale;
-  const clampedZoom = clamp(nextZoom, 1, 4);
+  const clampedZoom = clamp(nextZoom, 1, 8);
   const nextScale = modalBaseScale * clampedZoom;
   modalPanX = cursorX - worldX * nextScale;
   modalPanY = cursorY - worldY * nextScale;
