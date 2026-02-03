@@ -68,6 +68,7 @@ const drawCloseEl = document.getElementById("draw-close");
 const drawDeleteEl = document.getElementById("draw-delete");
 const drawLoadEl = document.getElementById("draw-load");
 const drawSaveEl = document.getElementById("draw-save");
+const drawModeOnlyEls = [...document.querySelectorAll(".draw-mode-only")];
 const zoomHelpEl = document.getElementById("zoom-help");
 const geojsonFileInputEl = document.getElementById("geojson-file-input");
 
@@ -280,6 +281,9 @@ function renderDrawOverlay() {
 function setDrawMode(next) {
   drawMode = next;
   drawToggleEl.textContent = drawMode ? "그리기 ON" : "그리기 OFF";
+  drawModeOnlyEls.forEach((el) => {
+    el.hidden = !drawMode;
+  });
   setDrawHelp(
     drawMode
       ? "그리기 ON: 탭으로 점 추가, 첫 점 탭 또는 '폴리곤 닫기'로 완료, 점 드래그로 수정"
