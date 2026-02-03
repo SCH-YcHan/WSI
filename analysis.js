@@ -271,7 +271,7 @@ function renderDrawOverlay() {
     .flatMap((polygon) =>
       polygon.points.map(
         (point, index) =>
-          `<circle class="draw-handle" data-poly-id="${polygon.id}" data-vertex-index="${index}" r="3.5" cx="${point.x}" cy="${point.y}"></circle>`
+          `<circle class="draw-handle" data-poly-id="${polygon.id}" data-vertex-index="${index}" r="2" cx="${point.x}" cy="${point.y}"></circle>`
       )
     )
     .join("");
@@ -285,7 +285,7 @@ function renderDrawOverlay() {
       ? draftPoints
           .map((point, index) => {
             const closeClass = index === 0 && draftPoints.length >= 3 ? " close-target" : "";
-            return `<circle class="draw-handle${closeClass}" data-draft-index="${index}" r="3.5" cx="${point.x}" cy="${point.y}"></circle>`;
+            return `<circle class="draw-handle${closeClass}" data-draft-index="${index}" r="2" cx="${point.x}" cy="${point.y}"></circle>`;
           })
           .join("")
       : "";
