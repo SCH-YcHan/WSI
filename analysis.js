@@ -66,9 +66,10 @@ const modalScaleLabelEl = document.getElementById("zoom-scale-label");
 const drawToggleEl = document.getElementById("draw-toggle");
 const drawCloseEl = document.getElementById("draw-close");
 const drawDeleteEl = document.getElementById("draw-delete");
-const drawLinkDirEl = document.getElementById("draw-link-dir");
+const drawLoadEl = document.getElementById("draw-load");
 const drawSaveEl = document.getElementById("draw-save");
 const zoomHelpEl = document.getElementById("zoom-help");
+const geojsonFileInputEl = document.getElementById("geojson-file-input");
 
 let overlayLoaded = false;
 let overlayVisible = false;
@@ -90,7 +91,6 @@ let userPolygons = [];
 let selectedPolygonId = null;
 let dragVertex = null;
 let polygonIdSeed = 1;
-let saveRootDirHandle = null;
 
 function setError(text) {
   titleEl.textContent = "이미지를 찾을 수 없습니다.";
@@ -107,6 +107,30 @@ function buildPath(rings, scaleX, scaleY) {
           .join(" ") + " Z"
     )
     .join(" ");
+}
+
+function buildOverlayMarkupFromGeojson(data, imageWidth, imageHeight) {
+  const scaleX = imageWidth / sample.sourceWidth;
+  const scaleY = imageHeight / sample.sourceHeight;
+  const paths = [];
+  (data.features || []).forEach((feature) => {
+    const geometry = feature.geometry;
+    if (!geometry) return;
+    if (geometry.type === "Polygon") {
+      paths.push(buildPath(geometry.coordinates, scaleX, scaleY));
+    } else if (geometry.type === "MultiPolygon") {
+      geometry.coordinates.forEach((polygon) => {
+        paths.push(buildPath(polygon, scaleX, scaleY));
+      });
+    }
+  });
+
+  return paths
+    .map(
+      (d) =>
+        `<path d="${d}" fill="rgba(46, 204, 113, 0.14)" stroke="rgba(39, 174, 96, 0.85)" stroke-width="0.9" vector-effect="non-scaling-stroke"></path>`
+    )
+    .join("");
 }
 
 function waitForImageReady(imgEl) {
@@ -323,16 +347,6 @@ function saveUserPolygons() {
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "").replace("T", "-");
   const filename = `${slug}-user-annotations-${stamp}.geojson`;
   const payload = JSON.stringify(featureCollection, null, 2);
-
-  if (saveRootDirHandle) {
-    saveUserPolygonsToDirectory(filename, payload)
-      .then(() => setDrawHelp(`저장 완료: public/user-annotations/${filename}`))
-      .catch(() => {
-        saveUserPolygonsAsDownload(filename, payload);
-      });
-    return;
-  }
-
   saveUserPolygonsAsDownload(filename, payload);
 }
 
@@ -347,26 +361,6 @@ function saveUserPolygonsAsDownload(filename, payload) {
   anchor.remove();
   URL.revokeObjectURL(url);
   setDrawHelp(`다운로드 저장 완료: ${filename}`);
-}
-
-async function connectSaveDirectory() {
-  if (!window.showDirectoryPicker) {
-    setDrawHelp("이 브라우저는 폴더 저장 연결을 지원하지 않습니다.");
-    return;
-  }
-
-  const picked = await window.showDirectoryPicker({ mode: "readwrite" });
-  saveRootDirHandle = picked;
-  drawLinkDirEl.textContent = "저장 위치 연결됨";
-  setDrawHelp("저장 위치 연결 완료. user-annotations 폴더에 저장합니다.");
-}
-
-async function saveUserPolygonsToDirectory(filename, payload) {
-  const annotationsDir = await saveRootDirHandle.getDirectoryHandle("user-annotations", { create: true });
-  const fileHandle = await annotationsDir.getFileHandle(filename, { create: true });
-  const writable = await fileHandle.createWritable();
-  await writable.write(payload);
-  await writable.close();
 }
 
 function renderOverlayInto(svgEl, imgEl) {
@@ -415,27 +409,8 @@ async function loadOverlay() {
     const res = await fetch(sample.geojson);
     if (!res.ok) throw new Error("geojson load failed");
     const data = await res.json();
-    const scaleX = imageEl.naturalWidth / sample.sourceWidth;
-    const scaleY = imageEl.naturalHeight / sample.sourceHeight;
     overlayEl.setAttribute("viewBox", `0 0 ${imageEl.naturalWidth} ${imageEl.naturalHeight}`);
-    const paths = [];
-    data.features.forEach((feature) => {
-      const geometry = feature.geometry;
-      if (!geometry) return;
-      if (geometry.type === "Polygon") {
-        paths.push(buildPath(geometry.coordinates, scaleX, scaleY));
-      } else {
-        geometry.coordinates.forEach((polygon) => {
-          paths.push(buildPath(polygon, scaleX, scaleY));
-        });
-      }
-    });
-
-    overlayMarkup = paths
-      .map(
-        (d) =>
-          `<path d="${d}" fill="rgba(46, 204, 113, 0.14)" stroke="rgba(39, 174, 96, 0.85)" stroke-width="0.9" vector-effect="non-scaling-stroke"></path>`
-      ).join("");
+    overlayMarkup = buildOverlayMarkupFromGeojson(data, imageEl.naturalWidth, imageEl.naturalHeight);
     renderOverlayInto(overlayEl, imageEl);
     if (!modalEl.hidden && modalImageEl.naturalWidth > 0) {
       renderOverlayInto(modalOverlayEl, modalImageEl);
@@ -447,6 +422,36 @@ async function loadOverlay() {
   } catch {
     statusEl.textContent = "GeoJSON 객체를 불러오지 못했습니다.";
     toggleEl.disabled = true;
+  }
+}
+
+async function loadOverlayFromLocalFile(file) {
+  if (!file || !sample) return;
+  statusEl.textContent = "로컬 GeoJSON 불러오는 중...";
+  try {
+    await waitForImageReady(imageEl);
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!data || data.type !== "FeatureCollection" || !Array.isArray(data.features)) {
+      throw new Error("invalid geojson");
+    }
+
+    overlayMarkup = buildOverlayMarkupFromGeojson(data, imageEl.naturalWidth, imageEl.naturalHeight);
+    overlayLoaded = true;
+    overlayVisible = true;
+    toggleEl.textContent = "객체 숨기기";
+    renderOverlayInto(overlayEl, imageEl);
+    if (!modalEl.hidden && modalImageEl.naturalWidth > 0) {
+      renderOverlayInto(modalOverlayEl, modalImageEl);
+    }
+    syncOverlayVisibility();
+    setDrawHelp(`로컬 파일 적용: ${file.name}`);
+    statusEl.textContent = "";
+  } catch {
+    statusEl.textContent = "로컬 GeoJSON 불러오기에 실패했습니다.";
+    setDrawHelp("GeoJSON 파일 형식을 확인해주세요.");
+  } finally {
+    geojsonFileInputEl.value = "";
   }
 }
 
@@ -521,12 +526,13 @@ drawSaveEl.addEventListener("click", () => {
   saveUserPolygons();
 });
 
-drawLinkDirEl.addEventListener("click", async () => {
-  try {
-    await connectSaveDirectory();
-  } catch {
-    setDrawHelp("저장 위치 연결이 취소되었습니다.");
-  }
+drawLoadEl.addEventListener("click", () => {
+  geojsonFileInputEl.click();
+});
+
+geojsonFileInputEl.addEventListener("change", async (event) => {
+  const [file] = event.target.files || [];
+  await loadOverlayFromLocalFile(file);
 });
 
 modalDrawOverlayEl.addEventListener("pointerdown", (event) => {
