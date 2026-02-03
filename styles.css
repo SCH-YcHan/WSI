@@ -31,7 +31,7 @@ a { color: inherit; text-decoration: none; }
 .hero-copy { font-size: 1.12rem; color: var(--ink-700); line-height: 1.45; }
 .hero-card, .card, .panel, .analysis-detail-card { background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(17, 19, 20, 0.1); border-radius: 20px; }
 .hero-card { padding: 28px; }
-.hero-main-card { max-width: 980px; }
+.hero-main-card { width: 100%; max-width: none; }
 .content-card {
   margin-top: 0;
   padding: 28px;
