@@ -50,8 +50,10 @@ const sample = samples[slug];
 const titleEl = document.getElementById("sample-title");
 const wrapEl = document.getElementById("image-wrap");
 const imageEl = document.getElementById("sample-image");
-const overlayEl = document.getElementById("overlay");
-const toggleEl = document.getElementById("toggle-overlay");
+const overlayBaseEl = document.getElementById("overlay-base");
+const overlayImportedEl = document.getElementById("overlay-imported");
+const toggleBaseEl = document.getElementById("toggle-base-overlay");
+const toggleImportedEl = document.getElementById("toggle-imported-overlay");
 const statusEl = document.getElementById("status-text");
 const modalEl = document.getElementById("zoom-modal");
 const modalCloseEl = document.getElementById("zoom-close");
@@ -60,7 +62,8 @@ const modalZoomOutEl = document.getElementById("zoom-out");
 const modalViewportEl = document.getElementById("zoom-viewport");
 const modalContentEl = document.getElementById("zoom-content");
 const modalImageEl = document.getElementById("zoom-image");
-const modalOverlayEl = document.getElementById("zoom-overlay");
+const modalOverlayBaseEl = document.getElementById("zoom-overlay-base");
+const modalOverlayImportedEl = document.getElementById("zoom-overlay-imported");
 const modalDrawOverlayEl = document.getElementById("zoom-draw-overlay");
 const modalScaleLabelEl = document.getElementById("zoom-scale-label");
 const drawToggleEl = document.getElementById("draw-toggle");
@@ -72,9 +75,12 @@ const drawModeOnlyEls = [...document.querySelectorAll(".draw-mode-only")];
 const zoomHelpEl = document.getElementById("zoom-help");
 const geojsonFileInputEl = document.getElementById("geojson-file-input");
 
-let overlayLoaded = false;
-let overlayVisible = false;
-let overlayMarkup = "";
+let baseOverlayLoaded = false;
+let baseOverlayVisible = false;
+let baseOverlayMarkup = "";
+let importedOverlayLoaded = false;
+let importedOverlayVisible = false;
+let importedOverlayMarkup = "";
 
 let modalZoom = 1;
 let modalBaseScale = 1;
@@ -96,7 +102,8 @@ let polygonIdSeed = 1;
 function setError(text) {
   titleEl.textContent = "이미지를 찾을 수 없습니다.";
   statusEl.textContent = text;
-  toggleEl.disabled = true;
+  toggleBaseEl.disabled = true;
+  toggleImportedEl.disabled = true;
 }
 
 function buildPath(rings, scaleX, scaleY) {
@@ -110,9 +117,11 @@ function buildPath(rings, scaleX, scaleY) {
     .join(" ");
 }
 
-function buildOverlayMarkupFromGeojson(data, imageWidth, imageHeight) {
+function buildOverlayMarkupFromGeojson(data, imageWidth, imageHeight, tone = "base") {
   const scaleX = imageWidth / sample.sourceWidth;
   const scaleY = imageHeight / sample.sourceHeight;
+  const fill = tone === "imported" ? "rgba(255, 90, 90, 0.16)" : "rgba(46, 204, 113, 0.14)";
+  const stroke = tone === "imported" ? "rgba(255, 64, 64, 0.95)" : "rgba(39, 174, 96, 0.85)";
   const paths = [];
   (data.features || []).forEach((feature) => {
     const geometry = feature.geometry;
@@ -129,7 +138,7 @@ function buildOverlayMarkupFromGeojson(data, imageWidth, imageHeight) {
   return paths
     .map(
       (d) =>
-        `<path d="${d}" fill="rgba(46, 204, 113, 0.14)" stroke="rgba(39, 174, 96, 0.85)" stroke-width="0.9" vector-effect="non-scaling-stroke"></path>`
+        `<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="0.9" vector-effect="non-scaling-stroke"></path>`
     )
     .join("");
 }
@@ -158,10 +167,17 @@ function waitForImageReady(imgEl) {
   });
 }
 
+function updateOverlayToggleLabels() {
+  toggleBaseEl.textContent = baseOverlayVisible ? "기존 객체 숨기기" : "기존 객체 보기";
+  toggleImportedEl.textContent = importedOverlayVisible ? "불러온 객체 숨기기" : "불러온 객체 보기";
+}
+
 function syncOverlayVisibility() {
-  const display = overlayVisible ? "block" : "none";
-  overlayEl.style.display = display;
-  modalOverlayEl.style.display = display;
+  overlayBaseEl.style.display = baseOverlayVisible ? "block" : "none";
+  modalOverlayBaseEl.style.display = baseOverlayVisible ? "block" : "none";
+  overlayImportedEl.style.display = importedOverlayVisible ? "block" : "none";
+  modalOverlayImportedEl.style.display = importedOverlayVisible ? "block" : "none";
+  updateOverlayToggleLabels();
 }
 
 function clamp(value, min, max) {
@@ -367,9 +383,9 @@ function saveUserPolygonsAsDownload(filename, payload) {
   setDrawHelp(`다운로드 저장 완료: ${filename}`);
 }
 
-function renderOverlayInto(svgEl, imgEl) {
+function renderOverlayInto(svgEl, imgEl, markup) {
   svgEl.setAttribute("viewBox", `0 0 ${imgEl.naturalWidth} ${imgEl.naturalHeight}`);
-  svgEl.innerHTML = overlayMarkup;
+  svgEl.innerHTML = markup;
 }
 
 async function openZoomModal() {
@@ -379,10 +395,13 @@ async function openZoomModal() {
   modalImageEl.src = sample.image;
   await waitForImageReady(modalImageEl);
 
-  if (overlayLoaded) {
-    renderOverlayInto(modalOverlayEl, modalImageEl);
-    syncOverlayVisibility();
+  if (baseOverlayLoaded) {
+    renderOverlayInto(modalOverlayBaseEl, modalImageEl, baseOverlayMarkup);
   }
+  if (importedOverlayLoaded) {
+    renderOverlayInto(modalOverlayImportedEl, modalImageEl, importedOverlayMarkup);
+  }
+  syncOverlayVisibility();
 
   const viewportW = modalViewportEl.clientWidth;
   const viewportH = modalViewportEl.clientHeight;
@@ -404,28 +423,25 @@ function closeZoomModal() {
   modalViewportEl.classList.remove("dragging");
 }
 
-async function loadOverlay() {
-  if (!sample || overlayLoaded) return;
+async function loadBaseOverlay() {
+  if (!sample || baseOverlayLoaded) return;
 
-  statusEl.textContent = "객체를 불러오는 중...";
+  statusEl.textContent = "기존 객체를 불러오는 중...";
   try {
     await waitForImageReady(imageEl);
     const res = await fetch(sample.geojson);
     if (!res.ok) throw new Error("geojson load failed");
     const data = await res.json();
-    overlayEl.setAttribute("viewBox", `0 0 ${imageEl.naturalWidth} ${imageEl.naturalHeight}`);
-    overlayMarkup = buildOverlayMarkupFromGeojson(data, imageEl.naturalWidth, imageEl.naturalHeight);
-    renderOverlayInto(overlayEl, imageEl);
+    baseOverlayMarkup = buildOverlayMarkupFromGeojson(data, imageEl.naturalWidth, imageEl.naturalHeight, "base");
+    renderOverlayInto(overlayBaseEl, imageEl, baseOverlayMarkup);
     if (!modalEl.hidden && modalImageEl.naturalWidth > 0) {
-      renderOverlayInto(modalOverlayEl, modalImageEl);
+      renderOverlayInto(modalOverlayBaseEl, modalImageEl, baseOverlayMarkup);
     }
-    syncOverlayVisibility();
-
-    overlayLoaded = true;
+    baseOverlayLoaded = true;
     statusEl.textContent = "";
   } catch {
-    statusEl.textContent = "GeoJSON 객체를 불러오지 못했습니다.";
-    toggleEl.disabled = true;
+    statusEl.textContent = "기존 객체를 불러오지 못했습니다.";
+    toggleBaseEl.disabled = true;
   }
 }
 
@@ -440,13 +456,13 @@ async function loadOverlayFromLocalFile(file) {
       throw new Error("invalid geojson");
     }
 
-    overlayMarkup = buildOverlayMarkupFromGeojson(data, imageEl.naturalWidth, imageEl.naturalHeight);
-    overlayLoaded = true;
-    overlayVisible = true;
-    toggleEl.textContent = "객체 숨기기";
-    renderOverlayInto(overlayEl, imageEl);
+    importedOverlayMarkup = buildOverlayMarkupFromGeojson(data, imageEl.naturalWidth, imageEl.naturalHeight, "imported");
+    importedOverlayLoaded = true;
+    importedOverlayVisible = true;
+    toggleImportedEl.disabled = false;
+    renderOverlayInto(overlayImportedEl, imageEl, importedOverlayMarkup);
     if (!modalEl.hidden && modalImageEl.naturalWidth > 0) {
-      renderOverlayInto(modalOverlayEl, modalImageEl);
+      renderOverlayInto(modalOverlayImportedEl, modalImageEl, importedOverlayMarkup);
     }
     syncOverlayVisibility();
     setDrawHelp(`로컬 파일 적용: ${file.name}`);
@@ -467,20 +483,26 @@ if (!sample) {
 }
 
 setDrawMode(false);
+updateOverlayToggleLabels();
 
 wrapEl.addEventListener("click", () => {
   openZoomModal();
 });
 
-toggleEl.addEventListener("click", async () => {
-  if (!overlayLoaded) {
-    await loadOverlay();
-    if (!overlayLoaded) return;
+toggleBaseEl.addEventListener("click", async () => {
+  if (!baseOverlayLoaded) {
+    await loadBaseOverlay();
+    if (!baseOverlayLoaded) return;
   }
 
-  overlayVisible = !overlayVisible;
+  baseOverlayVisible = !baseOverlayVisible;
   syncOverlayVisibility();
-  toggleEl.textContent = overlayVisible ? "객체 숨기기" : "객체 보기";
+});
+
+toggleImportedEl.addEventListener("click", () => {
+  if (!importedOverlayLoaded) return;
+  importedOverlayVisible = !importedOverlayVisible;
+  syncOverlayVisibility();
 });
 
 modalCloseEl.addEventListener("click", closeZoomModal);

@@ -14,12 +14,14 @@
         <div class="analysis-detail-image" id="image-wrap">
           <div class="analysis-zoom-layer" id="zoom-layer">
             <img id="sample-image" alt="Sample" />
-            <svg id="overlay" class="analysis-overlay" preserveAspectRatio="none"></svg>
+            <svg id="overlay-base" class="analysis-overlay" preserveAspectRatio="none"></svg>
+            <svg id="overlay-imported" class="analysis-overlay" preserveAspectRatio="none"></svg>
           </div>
         </div>
         <div class="analysis-detail-actions">
           <a class="btn ghost" href="index.html">메인으로</a>
-          <button class="btn ghost" id="toggle-overlay" type="button">객체 보기</button>
+          <button class="btn ghost" id="toggle-base-overlay" type="button">기존 객체 보기</button>
+          <button class="btn ghost" id="toggle-imported-overlay" type="button" disabled>불러온 객체 보기</button>
         </div>
         <p class="hint" id="status-text"></p>
       </div>
@@ -41,7 +43,8 @@
       <div class="zoom-modal-viewport" id="zoom-viewport">
         <div class="zoom-modal-content" id="zoom-content">
           <img id="zoom-image" alt="Zoom Sample" />
-          <svg id="zoom-overlay" class="analysis-overlay" preserveAspectRatio="none"></svg>
+          <svg id="zoom-overlay-base" class="analysis-overlay" preserveAspectRatio="none"></svg>
+          <svg id="zoom-overlay-imported" class="analysis-overlay" preserveAspectRatio="none"></svg>
           <svg id="zoom-draw-overlay" class="analysis-overlay zoom-draw-overlay" preserveAspectRatio="none"></svg>
         </div>
       </div>
