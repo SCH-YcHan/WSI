@@ -1,0 +1,259 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "source": "WT4 Normal x20",
+    "slug": "wt4-normal-x20",
+    "createdAt": "2026-02-04T05:37:52.221Z",
+    "note": "User annotations exported separately from original geojson"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "objectType": "user-annotation",
+        "polygonId": 1
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              5759.35,
+              1724.806
+            ],
+            [
+              5728.102,
+              1731.056
+            ],
+            [
+              5712.478,
+              1771.68
+            ],
+            [
+              5753.1,
+              1799.804
+            ],
+            [
+              5781.223,
+              1774.805
+            ],
+            [
+              5759.35,
+              1724.806
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "objectType": "user-annotation",
+        "polygonId": 2
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              1784.237,
+              6562.182
+            ],
+            [
+              1721.742,
+              6562.182
+            ],
+            [
+              1696.744,
+              6602.806
+            ],
+            [
+              1756.114,
+              6662.179
+            ],
+            [
+              1815.485,
+              6643.43
+            ],
+            [
+              1840.483,
+              6590.306
+            ],
+            [
+              1784.237,
+              6562.182
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "objectType": "user-annotation",
+        "polygonId": 3
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              1518.633,
+              6665.304
+            ],
+            [
+              1462.387,
+              6674.679
+            ],
+            [
+              1456.138,
+              6740.302
+            ],
+            [
+              1528.007,
+              6777.801
+            ],
+            [
+              1549.88,
+              6718.428
+            ],
+            [
+              1518.633,
+              6665.304
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "objectType": "user-annotation",
+        "polygonId": 4
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              2102.962,
+              12977.642
+            ],
+            [
+              2062.341,
+              12952.643
+            ],
+            [
+              2018.594,
+              12971.392
+            ],
+            [
+              2021.719,
+              13058.89
+            ],
+            [
+              2065.465,
+              13093.264
+            ],
+            [
+              2131.085,
+              13030.766
+            ],
+            [
+              2102.962,
+              12977.642
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "objectType": "user-annotation",
+        "polygonId": 5
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              9057.095,
+              10918.32
+            ],
+            [
+              8997.724,
+              10912.07
+            ],
+            [
+              8957.103,
+              10943.319
+            ],
+            [
+              8972.726,
+              11012.068
+            ],
+            [
+              9013.348,
+              11018.317
+            ],
+            [
+              9050.845,
+              10968.319
+            ],
+            [
+              9057.095,
+              10918.32
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "objectType": "user-annotation",
+        "polygonId": 6
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              5201.142,
+              2971.65
+            ],
+            [
+              5151.146,
+              2937.275
+            ],
+            [
+              5085.526,
+              2984.149
+            ],
+            [
+              5091.775,
+              3040.398
+            ],
+            [
+              5123.023,
+              3102.896
+            ],
+            [
+              5173.019,
+              3106.021
+            ],
+            [
+              5204.267,
+              3024.773
+            ],
+            [
+              5201.142,
+              2971.65
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

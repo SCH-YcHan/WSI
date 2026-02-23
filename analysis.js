@@ -5,6 +5,7 @@ const samples = {
     sourceWidth: 13300,
     sourceHeight: 19432,
     geojson: "public/geojson/wt1-adenine-x20.geojson",
+    importedGeojson: "public/geojson_new/wt1-adenine-x20-user-annotations-20260203-073208.geojson",
   },
   "wt2-adenine-x20": {
     title: "WT2 Adenine x20",
@@ -12,6 +13,7 @@ const samples = {
     sourceWidth: 13297,
     sourceHeight: 21276,
     geojson: "public/geojson/wt2-adenine-x20.geojson",
+    importedGeojson: "public/geojson_new/wt2-adenine-x20-user-annotations-20260203-075133.geojson",
   },
   "wt3-adenine-x20": {
     title: "WT3 Adenine x20",
@@ -19,6 +21,7 @@ const samples = {
     sourceWidth: 13299,
     sourceHeight: 20354,
     geojson: "public/geojson/wt3-adenine-x20.geojson",
+    importedGeojson: "public/geojson_new/wt3-adenine-x20-user-annotations-20260204-053047.geojson",
   },
   "wt4-normal-x20": {
     title: "WT4 Normal x20",
@@ -26,6 +29,7 @@ const samples = {
     sourceWidth: 11096,
     sourceHeight: 19437,
     geojson: "public/geojson/wt4-normal-x20.geojson",
+    importedGeojson: "public/geojson_new/wt4-normal-x20-user-annotations-20260204-053752.geojson",
   },
   "wt5-normal-x20": {
     title: "WT5 Normal x20",
@@ -33,6 +37,7 @@ const samples = {
     sourceWidth: 11096,
     sourceHeight: 19437,
     geojson: "public/geojson/wt5-normal-x20.geojson",
+    importedGeojson: "public/geojson_new/wt5-normal-x20-user-annotations-20260204-054438.geojson",
   },
   "wt6-normal-x20": {
     title: "WT6 Normal x20",
@@ -40,6 +45,7 @@ const samples = {
     sourceWidth: 14403,
     sourceHeight: 19430,
     geojson: "public/geojson/wt6-normal-x20.geojson",
+    importedGeojson: "public/geojson_new/wt6-normal-x20-user-annotations-20260204-055901.geojson",
   },
 };
 
@@ -475,11 +481,41 @@ async function loadOverlayFromLocalFile(file) {
   }
 }
 
+async function loadImportedOverlayFromUrl(url) {
+  if (!url || !sample) return;
+  statusEl.textContent = "사구체 라벨 불러오는 중...";
+  try {
+    await waitForImageReady(imageEl);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("geojson load failed");
+    const data = await res.json();
+    if (!data || data.type !== "FeatureCollection" || !Array.isArray(data.features)) {
+      throw new Error("invalid geojson");
+    }
+
+    importedOverlayMarkup = buildOverlayMarkupFromGeojson(data, imageEl.naturalWidth, imageEl.naturalHeight, "imported");
+    importedOverlayLoaded = true;
+    importedOverlayVisible = true;
+    toggleImportedEl.disabled = false;
+    renderOverlayInto(overlayImportedEl, imageEl, importedOverlayMarkup);
+    if (!modalEl.hidden && modalImageEl.naturalWidth > 0) {
+      renderOverlayInto(modalOverlayImportedEl, modalImageEl, importedOverlayMarkup);
+    }
+    syncOverlayVisibility();
+    setDrawHelp("사구체 라벨 적용됨");
+    statusEl.textContent = "";
+  } catch {
+    statusEl.textContent = "사구체 라벨을 불러오지 못했습니다.";
+    toggleImportedEl.disabled = true;
+  }
+}
+
 if (!sample) {
   setError("유효하지 않은 샘플입니다.");
 } else {
   titleEl.textContent = sample.title;
   imageEl.src = sample.image;
+  toggleImportedEl.disabled = !sample.importedGeojson;
 }
 
 setDrawMode(false);
@@ -499,8 +535,11 @@ toggleBaseEl.addEventListener("click", async () => {
   syncOverlayVisibility();
 });
 
-toggleImportedEl.addEventListener("click", () => {
-  if (!importedOverlayLoaded) return;
+toggleImportedEl.addEventListener("click", async () => {
+  if (!importedOverlayLoaded) {
+    await loadImportedOverlayFromUrl(sample?.importedGeojson);
+    return;
+  }
   importedOverlayVisible = !importedOverlayVisible;
   syncOverlayVisibility();
 });
