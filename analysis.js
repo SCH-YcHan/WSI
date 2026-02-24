@@ -144,7 +144,7 @@ function buildOverlayMarkupFromGeojson(data, imageWidth, imageHeight, tone = "ba
   return paths
     .map(
       (d) =>
-        `<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="0.9" vector-effect="non-scaling-stroke"></path>`
+        `<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="0.3" vector-effect="non-scaling-stroke"></path>`
     )
     .join("");
 }
